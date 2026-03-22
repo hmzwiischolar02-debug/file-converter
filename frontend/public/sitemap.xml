@@ -74,4 +74,30 @@
     <priority>0.7</priority>
   </url>
 
+
+  <url>
+    <loc>https://file-converters.vercel.app/tool/jpg-to-png</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://file-converters.vercel.app/tool/png-to-jpg</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://file-converters.vercel.app/tool/html-to-pdf</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://file-converters.vercel.app/tool/watermark-pdf</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://file-converters.vercel.app/tool/pdf-to-html</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
 </urlset>

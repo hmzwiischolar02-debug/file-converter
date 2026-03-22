@@ -15,6 +15,7 @@ import ToolCard     from "../components/ToolCard";
 export default function ToolPage({ toolId, navigate }) {
   const tool = TOOLS[toolId];
   const [password, setPassword] = useState("");
+  const [watermark, setWatermark] = useState("CONFIDENTIAL");
 
   const { files, status, progress, result, error, handleFiles, convert, reset } =
     useConverter(tool);
@@ -32,15 +33,19 @@ export default function ToolPage({ toolId, navigate }) {
   }, [tool]);
 
   const relatedTools = TOOL_LIST.filter((t) => t.id !== toolId).slice(0, 3);
-  const needsPassword = toolId === "unlock-pdf";
+  const needsPassword  = toolId === "unlock-pdf";
+  const needsWatermark = toolId === "watermark-pdf";
 
   const handleConvert = () => {
-    convert(needsPassword ? { password } : {});
+    if (needsPassword)    return convert({ password });
+    if (needsWatermark)   return convert({ watermark_text: watermark });
+    convert({});
   };
 
   const handleReset = () => {
     reset();
     setPassword("");
+    setWatermark("CONFIDENTIAL");
   };
 
   return (
@@ -112,16 +117,39 @@ export default function ToolPage({ toolId, navigate }) {
                   </div>
                 )}
 
+                {/* Watermark text field */}
+                {needsWatermark && (
+                  <div className="mt-4">
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Watermark Text
+                    </label>
+                    <input
+                      type="text"
+                      value={watermark}
+                      onChange={(e) => setWatermark(e.target.value)}
+                      placeholder="e.g. CONFIDENTIAL, DRAFT, © Your Name…"
+                      maxLength={50}
+                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl text-sm focus:outline-none focus:border-cyan-400 transition-colors"
+                    />
+                    <p className="text-xs text-slate-400 mt-1.5">
+                      This text will appear diagonally across each page
+                    </p>
+                  </div>
+                )}
+
                 <AdBanner variant="horizontal" />
 
                 <button
                   onClick={handleConvert}
-                  disabled={needsPassword && !password.trim()}
+                  disabled={(needsPassword && !password.trim()) || (needsWatermark && !watermark.trim())}
                   className="w-full py-4 text-white font-bold rounded-2xl shadow-lg hover:opacity-90 active:scale-95 transition-all text-lg mt-2 disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{ background: `linear-gradient(135deg, ${tool.color}, ${tool.color}cc)` }}
                 >
-                  {toolId === "unlock-pdf"   ? "Unlock PDF →"         :
+                  {toolId === "unlock-pdf"    ? "Unlock PDF →"       :
                    toolId === "compress-image" ? "Compress Image →"   :
+                   toolId === "watermark-pdf"  ? "Add Watermark →"    :
+                   toolId === "html-to-pdf"    ? "Convert to PDF →"   :
+                   toolId === "pdf-to-html"    ? "Convert to HTML →"  :
                    `Convert to ${tool.to} →`}
                 </button>
               </>

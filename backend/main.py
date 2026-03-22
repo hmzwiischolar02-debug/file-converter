@@ -863,6 +863,175 @@ def do_unlock_pdf(pdf_bytes: bytes, password: str) -> bytes:
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
 
+def do_jpg_to_png(img_bytes: bytes) -> bytes:
+    """JPG → PNG (lossless, preserves full quality)."""
+    from PIL import Image
+    with Image.open(io.BytesIO(img_bytes)) as img:
+        buf = io.BytesIO()
+        img.convert("RGBA").save(buf, format="PNG", optimize=True)
+        return buf.getvalue()
+
+
+def do_png_to_jpg(img_bytes: bytes) -> bytes:
+    """PNG → JPG (flatten transparency to white, 90% quality)."""
+    from PIL import Image
+    with Image.open(io.BytesIO(img_bytes)) as img:
+        # Flatten transparent background to white
+        background = Image.new("RGB", img.size, (255, 255, 255))
+        if img.mode in ("RGBA", "LA", "P"):
+            background.paste(img.convert("RGBA"), mask=img.convert("RGBA").split()[3])
+        else:
+            background.paste(img.convert("RGB"))
+        buf = io.BytesIO()
+        background.save(buf, format="JPEG", quality=90, optimize=True)
+        return buf.getvalue()
+
+
+def do_html_to_pdf(html_bytes: bytes) -> bytes:
+    """HTML → PDF using xhtml2pdf (pure Python)."""
+    from xhtml2pdf import pisa
+
+    html_content = html_bytes.decode("utf-8", errors="replace")
+
+    # Inject base styles if not present
+    if "<style" not in html_content.lower():
+        style = """<style>
+        @page { margin: 2cm; }
+        body { font-family: Helvetica, Arial, sans-serif; font-size: 11pt; line-height: 1.6; color: #000; }
+        h1 { font-size: 20pt; font-weight: bold; margin: 14pt 0 8pt; }
+        h2 { font-size: 16pt; font-weight: bold; margin: 12pt 0 6pt; }
+        h3 { font-size: 13pt; font-weight: bold; margin: 10pt 0 4pt; }
+        p  { margin: 0 0 8pt; }
+        table { border-collapse: collapse; width: 100%; margin: 10pt 0; }
+        td, th { border: 1px solid #ccc; padding: 5pt 7pt; font-size: 9pt; }
+        th { background-color: #2563eb; color: white; font-weight: bold; }
+        ul, ol { margin: 0 0 8pt 18pt; }
+        li { margin-bottom: 3pt; }
+        </style>"""
+        html_content = html_content.replace("<head>", f"<head>{style}", 1)
+        if "<head>" not in html_content:
+            html_content = f"<html><head>{style}</head><body>{html_content}</body></html>"
+
+    buf = io.BytesIO()
+    status = pisa.CreatePDF(html_content, dest=buf, encoding="utf-8")
+    if status.err:
+        raise HTTPException(500, f"HTML to PDF conversion failed with error code {status.err}")
+    return buf.getvalue()
+
+
+def do_watermark_pdf(pdf_bytes: bytes, watermark_text: str) -> bytes:
+    """Add diagonal text watermark to every page of a PDF."""
+    from pypdf import PdfWriter, PdfReader
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.pdfgen import canvas as rl_canvas
+    import math
+
+    # Create a single-page watermark PDF in memory
+    wm_buf = io.BytesIO()
+    c = rl_canvas.Canvas(wm_buf, pagesize=letter)
+    page_w, page_h = letter
+
+    c.saveState()
+    c.setFont("Helvetica-Bold", 48)
+    c.setFillColor(colors.Color(0.6, 0.6, 0.6, alpha=0.3))  # 30% opacity grey
+    c.translate(page_w / 2, page_h / 2)
+    c.rotate(45)
+    c.drawCentredString(0, 0, watermark_text.upper())
+    c.restoreState()
+    c.save()
+    wm_buf.seek(0)
+
+    from pypdf import PdfReader as PR
+    wm_reader = PR(wm_buf)
+    wm_page   = wm_reader.pages[0]
+
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    writer = PdfWriter()
+
+    for page in reader.pages:
+        # Merge watermark onto each page
+        page.merge_page(wm_page)
+        writer.add_page(page)
+
+    buf = io.BytesIO()
+    writer.write(buf)
+    return buf.getvalue()
+
+
+def do_pdf_to_html(pdf_bytes: bytes) -> bytes:
+    """
+    PDF → HTML using PyMuPDF for best text extraction with layout.
+    Returns HTML bytes.
+    """
+    import fitz
+
+    pdf_doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    pages_html = []
+
+    for page_num in range(len(pdf_doc)):
+        page = pdf_doc[page_num]
+        # get_text("html") gives structured HTML per page
+        page_html = page.get_text("html")
+        pages_html.append(f"""
+        <div class="page" id="page-{page_num + 1}">
+          <div class="page-label">Page {page_num + 1}</div>
+          {page_html}
+        </div>
+        """)
+
+    pdf_doc.close()
+
+    full_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Converted PDF</title>
+  <style>
+    body {{
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 12pt;
+      line-height: 1.6;
+      color: #000;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f8fafc;
+    }}
+    .page {{
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 40px 48px;
+      margin-bottom: 32px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }}
+    .page-label {{
+      font-size: 10pt;
+      color: #94a3b8;
+      font-weight: 600;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #f1f5f9;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }}
+    p {{ margin: 0 0 8pt; }}
+    span {{ font-family: inherit !important; }}
+  </style>
+</head>
+<body>
+  {"".join(pages_html)}
+  <footer style="text-align:center;padding:20px;color:#94a3b8;font-size:10pt;">
+    Converted with FileConvert.io
+  </footer>
+</body>
+</html>"""
+
+    return full_html.encode("utf-8")
+
+
 # ── Diagnostics endpoint ───────────────────────────────────────────────────────
 @app.get("/diagnostics")
 async def diagnostics():
@@ -1232,3 +1401,106 @@ async def unlock_pdf(
     except Exception as e:
         raise HTTPException(500, f"PDF unlock failed: {e}")
     return stream(data, "unlocked.pdf", "application/pdf")
+
+
+# ── 13. JPG → PNG ──────────────────────────────────────────────────────────────
+@limiter.limit(RATE_LIMIT)
+@app.post("/convert/jpg-to-png")
+async def jpg_to_png(request: Request, files: List[UploadFile] = File(...)):
+    f = files[0]
+    ext = Path(f.filename or "").suffix.lower()
+    if ext not in {".jpg", ".jpeg"}:
+        raise HTTPException(422, "Please upload a JPG or JPEG file.")
+    raw = await f.read()
+    validate_size(raw)
+    try:
+        data = await asyncio.get_event_loop().run_in_executor(None, do_jpg_to_png, raw)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"JPG to PNG failed: {e}")
+    name = Path(f.filename or "image").stem + ".png"
+    return stream(data, name, "image/png")
+
+
+# ── 14. PNG → JPG ──────────────────────────────────────────────────────────────
+@limiter.limit(RATE_LIMIT)
+@app.post("/convert/png-to-jpg")
+async def png_to_jpg(request: Request, files: List[UploadFile] = File(...)):
+    f = files[0]
+    if Path(f.filename or "").suffix.lower() != ".png":
+        raise HTTPException(422, "Please upload a PNG file.")
+    raw = await f.read()
+    validate_size(raw)
+    try:
+        data = await asyncio.get_event_loop().run_in_executor(None, do_png_to_jpg, raw)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"PNG to JPG failed: {e}")
+    name = Path(f.filename or "image").stem + ".jpg"
+    return stream(data, name, "image/jpeg")
+
+
+# ── 15. HTML → PDF ─────────────────────────────────────────────────────────────
+@limiter.limit(RATE_LIMIT)
+@app.post("/convert/html-to-pdf")
+async def html_to_pdf(request: Request, files: List[UploadFile] = File(...)):
+    f = files[0]
+    ext = Path(f.filename or "").suffix.lower()
+    if ext not in {".html", ".htm"}:
+        raise HTTPException(422, "Please upload an HTML or HTM file.")
+    raw = await f.read()
+    validate_size(raw)
+    try:
+        data = await asyncio.get_event_loop().run_in_executor(None, do_html_to_pdf, raw)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"HTML to PDF failed: {e}")
+    return stream(data, "converted.pdf", "application/pdf")
+
+
+# ── 16. Watermark PDF ──────────────────────────────────────────────────────────
+@limiter.limit(RATE_LIMIT)
+@app.post("/convert/watermark-pdf")
+async def watermark_pdf(
+    request: Request,
+    files: List[UploadFile] = File(...),
+    watermark_text: str = "CONFIDENTIAL",
+):
+    f = files[0]
+    if Path(f.filename or "").suffix.lower() != ".pdf":
+        raise HTTPException(422, "Please upload a PDF file.")
+    if not watermark_text.strip():
+        raise HTTPException(422, "Watermark text cannot be empty.")
+    raw = await f.read()
+    validate_size(raw)
+    try:
+        data = await asyncio.get_event_loop().run_in_executor(
+            None, do_watermark_pdf, raw, watermark_text.strip()
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Watermark failed: {e}")
+    return stream(data, "watermarked.pdf", "application/pdf")
+
+
+# ── 17. PDF → HTML ─────────────────────────────────────────────────────────────
+@limiter.limit(RATE_LIMIT)
+@app.post("/convert/pdf-to-html")
+async def pdf_to_html(request: Request, files: List[UploadFile] = File(...)):
+    f = files[0]
+    if Path(f.filename or "").suffix.lower() != ".pdf":
+        raise HTTPException(422, "Please upload a PDF file.")
+    raw = await f.read()
+    validate_size(raw)
+    try:
+        data = await asyncio.get_event_loop().run_in_executor(None, do_pdf_to_html, raw)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"PDF to HTML failed: {e}")
+    name = Path(f.filename or "document").stem + ".html"
+    return stream(data, name, "text/html")
