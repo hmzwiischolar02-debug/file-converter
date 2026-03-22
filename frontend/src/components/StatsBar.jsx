@@ -11,7 +11,7 @@ export default function StatsBar({ count }) {
         </span>
         <span className="flex items-center gap-2">
           ⚡ Average{" "}
-          <strong className="text-green-400">8 seconds</strong>{" "}
+          <strong className="text-green-400">7 seconds</strong>{" "}
           conversion time
         </span>
         <span className="flex items-center gap-2">
