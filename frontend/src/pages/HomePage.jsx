@@ -1,10 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { updateSEO, buildHomeSEO } from "../utils/seo";
 import ToolCard from "../components/ToolCard";
 import AdBanner from "../components/AdBanner";
 import { TOOL_LIST } from "../data/tools";
 
 export default function HomePage({ navigate }) {
   const [count] = useState(() => 47382 + Math.floor(Math.random() * 1000));
+
+  useEffect(() => {
+    updateSEO(buildHomeSEO());
+  }, []);
   return (
     <main>
       {/* Hero */}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { updateSEO, buildToolSEO } from "../utils/seo";
 import { TOOLS, TOOL_LIST } from "../data/tools";
 import { useConverter } from "../hooks/useConverter";
 import Breadcrumb   from "../components/Breadcrumb";
@@ -17,10 +18,8 @@ export default function ToolPage({ toolId, navigate }) {
   const { files, status, progress, result, error, handleFiles, convert, reset } = useConverter(tool);
 
   useEffect(() => {
-    document.title = tool.metaTitle;
-    let m = document.querySelector('meta[name="description"]');
-    if (!m) { m = document.createElement("meta"); m.name = "description"; document.head.appendChild(m); }
-    m.content = tool.metaDesc;
+    const seoData = buildToolSEO(tool);
+    updateSEO(seoData);
   }, [tool]);
 
   const related       = TOOL_LIST.filter(t => t.id !== toolId).slice(0, 3);

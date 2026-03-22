@@ -1,4 +1,12 @@
 User-agent: *
 Allow: /
 
+# Disallow any temp/api paths
+Disallow: /api/
+Disallow: /*.json$
+
+# Sitemap
 Sitemap: https://file-converters.vercel.app/sitemap.xml
+
+# Crawl-delay for polite bots
+Crawl-delay: 1
