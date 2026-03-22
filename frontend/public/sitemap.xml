@@ -40,4 +40,9 @@
   <url><loc>https://file-converters.vercel.app/tool/jpg-to-png</loc><lastmod>2026-03-22</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://file-converters.vercel.app/tool/png-to-jpg</loc><lastmod>2026-03-22</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
 
+
+  <!-- Legal pages -->
+  <url><loc>https://file-converters.vercel.app/privacy</loc><lastmod>2026-03-22</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://file-converters.vercel.app/terms</loc><lastmod>2026-03-22</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://file-converters.vercel.app/contact</loc><lastmod>2026-03-22</lastmod><changefreq>yearly</changefreq><priority>0.4</priority></url>
 </urlset>

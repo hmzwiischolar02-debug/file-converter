@@ -10,7 +10,10 @@ import Footer      from "./components/Footer";
 import HomePage     from "./pages/HomePage";
 import ToolsPage    from "./pages/ToolsPage";
 import ToolPage     from "./pages/ToolPage";
-import NotFoundPage from "./pages/NotFoundPage";
+import NotFoundPage  from "./pages/NotFoundPage";
+import PrivacyPage   from "./pages/PrivacyPage";
+import TermsPage     from "./pages/TermsPage";
+import ContactPage   from "./pages/ContactPage";
 
 export default function App() {
   const { path, navigate } = useRouter();
@@ -42,6 +45,10 @@ export default function App() {
         return <ToolPage key={toolId} toolId={toolId} navigate={navigate} />;
       }
     }
+
+    if (path === "/privacy")  return <PrivacyPage  navigate={navigate} />;
+    if (path === "/terms")    return <TermsPage    navigate={navigate} />;
+    if (path === "/contact")  return <ContactPage  navigate={navigate} />;
 
     return <NotFoundPage navigate={navigate} />;
   };

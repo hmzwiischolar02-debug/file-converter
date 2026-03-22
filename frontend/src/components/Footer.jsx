@@ -29,7 +29,17 @@ export default function Footer({ navigate }) {
           <div>
             <h4 className="font-semibold text-white text-sm mb-4">Company</h4>
             <ul className="space-y-2.5">
-              {["Privacy Policy","Terms of Service","Contact Us"].map(l => <li key={l}><a href="#" className="text-xs hover:text-white transition-colors">{l}</a></li>)}
+              {[
+                { label: "Privacy Policy",  path: "/privacy" },
+                { label: "Terms of Service",path: "/terms"   },
+                { label: "Contact Us",      path: "/contact" },
+              ].map(l => (
+                <li key={l.label}>
+                  <button onClick={() => navigate(l.path)} className="text-xs hover:text-white transition-colors text-left">
+                    {l.label}
+                  </button>
+                </li>
+              ))}
             </ul>
           </div>
         </div>
