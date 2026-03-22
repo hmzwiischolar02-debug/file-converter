@@ -889,94 +889,180 @@ def do_png_to_jpg(img_bytes: bytes) -> bytes:
 
 def do_html_to_pdf(html_bytes: bytes) -> bytes:
     """
-    HTML → PDF using xhtml2pdf (reliable, pure Python, no hanging).
+    HTML → PDF using pure reportlab (no xhtml2pdf, no PyMuPDF Story).
+    Parses HTML with Python's built-in html.parser, renders with reportlab.
+    Zero external dependencies beyond what is already installed.
     """
-    from xhtml2pdf import pisa
+    from html.parser import HTMLParser
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import cm
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, Table,
+        TableStyle, HRFlowable,
+    )
+    from reportlab.lib.enums import TA_LEFT, TA_CENTER
 
     html_content = html_bytes.decode("utf-8", errors="replace")
 
-    # Ensure valid full HTML document
-    if "<html" not in html_content.lower():
-        html_content = f"""<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"/>
-<style>
-  @page {{ margin: 2cm; }}
-  body {{ font-family: Helvetica, Arial, sans-serif; font-size: 11pt;
-          line-height: 1.6; color: #000; }}
-  h1 {{ font-size: 18pt; font-weight: bold; margin: 12pt 0 6pt; }}
-  h2 {{ font-size: 14pt; font-weight: bold; margin: 10pt 0 4pt; }}
-  h3 {{ font-size: 12pt; font-weight: bold; margin: 8pt 0 3pt; }}
-  p  {{ margin: 0 0 7pt; }}
-  table {{ border-collapse: collapse; width: 100%; margin: 8pt 0; }}
-  td, th {{ border: 1px solid #ccc; padding: 4pt 6pt; font-size: 9pt; }}
-  th {{ background-color: #2563eb; color: white; font-weight: bold; }}
-  ul, ol {{ margin: 0 0 7pt 16pt; }}
-  li {{ margin-bottom: 3pt; }}
-  strong, b {{ font-weight: bold; }}
-  em, i {{ font-style: italic; }}
-</style>
-</head>
-<body>{html_content}</body>
-</html>"""
-    elif "<style" not in html_content.lower():
-        # Inject base styles into existing head
-        base_style = """<style>
-  @page { margin: 2cm; }
-  body { font-family: Helvetica, Arial, sans-serif; font-size: 11pt;
-         line-height: 1.6; color: #000; }
-  h1 { font-size: 18pt; font-weight: bold; margin: 12pt 0 6pt; }
-  h2 { font-size: 14pt; font-weight: bold; margin: 10pt 0 4pt; }
-  p  { margin: 0 0 7pt; }
-  table { border-collapse: collapse; width: 100%; margin: 8pt 0; }
-  td, th { border: 1px solid #ccc; padding: 4pt 6pt; font-size: 9pt; }
-  th { background-color: #2563eb; color: white; font-weight: bold; }
-  ul, ol { margin: 0 0 7pt 16pt; }
-</style>"""
-        html_content = html_content.replace("</head>", base_style + "</head>", 1)
+    # ── Parse HTML into structured blocks ─────────────────────────────────────
+    class HTMLToParagraphs(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.blocks  = []   # list of (tag, text, attrs)
+            self.current_tag  = "p"
+            self.current_text = []
+            self.in_body = False
+            self.skip_tags = {"script", "style", "head", "meta", "link"}
+            self.current_skip = False
+            self.bold   = False
+            self.italic = False
+            self.href   = None
 
+        def handle_starttag(self, tag, attrs):
+            tag = tag.lower()
+            if tag in self.skip_tags:
+                self.current_skip = True
+                return
+            if tag == "body": self.in_body = True
+            if tag in ("b", "strong"): self.bold = True
+            if tag in ("i", "em"):     self.italic = True
+            if tag == "br":
+                self._flush()
+            if tag in ("h1","h2","h3","h4","p","li","td","th","caption"):
+                self._flush()
+                self.current_tag = tag
+            if tag == "hr":
+                self._flush()
+                self.blocks.append(("hr", "", {}))
+            if tag == "a":
+                d = dict(attrs)
+                self.href = d.get("href", "")
+
+        def handle_endtag(self, tag):
+            tag = tag.lower()
+            if tag in self.skip_tags:
+                self.current_skip = False
+                return
+            if tag in ("b","strong"): self.bold = False
+            if tag in ("i","em"):     self.italic = False
+            if tag == "a":            self.href = None
+            if tag in ("h1","h2","h3","h4","p","li","td","th","tr","div","section","article"):
+                self._flush()
+
+        def handle_data(self, data):
+            if self.current_skip or not self.in_body:
+                return
+            text = data.strip()
+            if not text:
+                return
+            # Apply inline formatting
+            if self.bold and self.italic:
+                text = f"<b><i>{self._esc(text)}</i></b>"
+            elif self.bold:
+                text = f"<b>{self._esc(text)}</b>"
+            elif self.italic:
+                text = f"<i>{self._esc(text)}</i>"
+            else:
+                text = self._esc(text)
+            self.current_text.append(text)
+
+        def _esc(self, t):
+            return (t.replace("&","&amp;")
+                     .replace("<","&lt;")
+                     .replace(">","&gt;"))
+
+        def _flush(self):
+            text = " ".join(self.current_text).strip()
+            if text:
+                self.blocks.append((self.current_tag, text, {}))
+            self.current_text = []
+
+        def get_blocks(self):
+            self._flush()
+            return self.blocks
+
+    parser = HTMLToParagraphs()
+    # If no <body> tag, wrap it
+    if "<body" not in html_content.lower():
+        html_content = f"<body>{html_content}</body>"
+        parser.in_body = True
+    parser.feed(html_content)
+    blocks = parser.get_blocks()
+
+    # ── Build PDF with reportlab ───────────────────────────────────────────────
     buf = io.BytesIO()
-    status = pisa.CreatePDF(
-        src=html_content,
-        dest=buf,
-        encoding="utf-8",
+    base = getSampleStyleSheet()
+
+    ST = {
+        "h1": ParagraphStyle("H1", parent=base["Normal"],
+                              fontSize=20, fontName="Helvetica-Bold",
+                              textColor=colors.HexColor("#1e293b"),
+                              spaceAfter=10, spaceBefore=14),
+        "h2": ParagraphStyle("H2", parent=base["Normal"],
+                              fontSize=16, fontName="Helvetica-Bold",
+                              textColor=colors.HexColor("#1e293b"),
+                              spaceAfter=8,  spaceBefore=10),
+        "h3": ParagraphStyle("H3", parent=base["Normal"],
+                              fontSize=13, fontName="Helvetica-Bold",
+                              textColor=colors.HexColor("#334155"),
+                              spaceAfter=6,  spaceBefore=8),
+        "h4": ParagraphStyle("H4", parent=base["Normal"],
+                              fontSize=11, fontName="Helvetica-Bold",
+                              textColor=colors.HexColor("#334155"),
+                              spaceAfter=5,  spaceBefore=6),
+        "p":  ParagraphStyle("P",  parent=base["Normal"],
+                              fontSize=11, leading=17,
+                              textColor=colors.HexColor("#0f172a"),
+                              spaceAfter=6),
+        "li": ParagraphStyle("LI", parent=base["Normal"],
+                              fontSize=11, leading=17,
+                              textColor=colors.HexColor("#0f172a"),
+                              leftIndent=18, spaceAfter=3),
+        "td": ParagraphStyle("TD", parent=base["Normal"],
+                              fontSize=9, leading=13),
+        "th": ParagraphStyle("TH", parent=base["Normal"],
+                              fontSize=9, leading=13,
+                              fontName="Helvetica-Bold",
+                              textColor=colors.white),
+    }
+
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=2.5*cm, rightMargin=2.5*cm,
+        topMargin=2.5*cm,  bottomMargin=2.5*cm,
     )
 
-    if status.err:
-        # Fallback: strip HTML and render plain text via reportlab
-        import re
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib.units import cm
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    story = []
+    for tag, text, attrs in blocks:
+        if tag == "hr":
+            story.append(HRFlowable(
+                width="100%", thickness=0.5,
+                color=colors.HexColor("#e2e8f0"),
+                spaceAfter=6, spaceBefore=6,
+            ))
+            continue
 
-        text = re.sub(r"<[^>]+>", " ", html_content)
-        text = re.sub(r"&nbsp;", " ", text)
-        text = re.sub(r"&amp;",  "&", text)
-        text = re.sub(r"&lt;",   "<", text)
-        text = re.sub(r"&gt;",   ">", text)
-        text = re.sub(r"\s+",    " ", text).strip()
+        st = ST.get(tag, ST["p"])
+        prefix = "• &nbsp;" if tag == "li" else ""
 
-        buf2 = io.BytesIO()
-        styles = getSampleStyleSheet()
-        body = ParagraphStyle("B", parent=styles["Normal"], fontSize=11, leading=17)
-        doc = SimpleDocTemplate(buf2, pagesize=A4,
-                                leftMargin=2.5*cm, rightMargin=2.5*cm,
-                                topMargin=2.5*cm,  bottomMargin=2.5*cm)
-        story = []
-        for line in text.split(". "):
-            line = line.strip()
-            if line:
-                safe = (line.replace("&", "&amp;")
-                            .replace("<", "&lt;")
-                            .replace(">", "&gt;"))
-                story.append(Paragraph(safe, body))
-                story.append(Spacer(1, 4))
-        if not story:
-            story.append(Paragraph("(empty document)", body))
-        doc.build(story)
-        return buf2.getvalue()
+        try:
+            story.append(Paragraph(prefix + text, st))
+        except Exception:
+            # If reportlab can't parse the rich text, strip tags
+            import re
+            plain = re.sub(r"<[^>]+>", "", text)
+            plain = plain.replace("&amp;","&").replace("&lt;","<").replace("&gt;",">").replace("&quot;",'"')
+            plain_safe = (plain.replace("&","&amp;")
+                               .replace("<","&lt;")
+                               .replace(">","&gt;"))
+            story.append(Paragraph(prefix + plain_safe, st))
 
+    if not story:
+        story.append(Paragraph("(empty document)", ST["p"]))
+
+    doc.build(story)
     return buf.getvalue()
 
 
