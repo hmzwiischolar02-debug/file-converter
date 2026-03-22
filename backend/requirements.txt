@@ -1,0 +1,32 @@
+# FileConvert — Backend Dependencies
+# pip install -r requirements.txt
+
+# ── Web framework ──────────────────────────────────────
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-multipart==0.0.20
+
+# ── Image tools ────────────────────────────────────────
+Pillow
+
+# ── PDF tools ──────────────────────────────────────────
+pypdf==5.1.0
+PyMuPDF==1.24.14
+reportlab==4.2.5
+pdf2docx==0.5.8
+
+# ── Word / DOCX ────────────────────────────────────────
+python-docx==1.1.2
+
+# ── Excel ──────────────────────────────────────────────
+openpyxl==3.1.5
+
+# ── PowerPoint ─────────────────────────────────────────
+python-pptx==1.0.2
+
+# ── Word → PDF: best quality on Windows ───────────────
+docx2pdf==0.1.8
+
+# ── Word → PDF: good quality, pure Python ─────────────
+mammoth==1.8.0
+xhtml2pdf==0.2.16
