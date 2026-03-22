@@ -1132,17 +1132,18 @@ def do_remove_background(img_bytes: bytes) -> bytes:
     Primary:  rembg (AI model — best quality, install separately)
     Fallback: Pillow GrabCut-style edge detection (good for simple backgrounds)
     """
-    # ── Primary: rembg AI model ───────────────────────────────────────────────
+    # ── Primary: rembg AI model (optional — install separately for best quality) ─
     try:
-        from rembg import remove as rembg_remove
+        import importlib
+        rembg_mod = importlib.import_module("rembg")
         from PIL import Image
         input_img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
-        output_img = rembg_remove(input_img)
+        output_img = rembg_mod.remove(input_img)
         buf = io.BytesIO()
         output_img.save(buf, format="PNG")
         return buf.getvalue()
-    except ImportError:
-        pass  # rembg not installed, use fallback
+    except (ImportError, ModuleNotFoundError):
+        pass  # rembg not installed, fall through to Pillow fallback
     except Exception:
         pass
 
