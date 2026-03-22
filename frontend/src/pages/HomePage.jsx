@@ -4,181 +4,170 @@ import ToolCard from "../components/ToolCard";
 import AdBanner from "../components/AdBanner";
 import { TOOL_LIST } from "../data/tools";
 
-function TrustBadge({ icon, value, label }) {
+function TrustCard({ icon, value, label }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5 text-center hover:shadow-md transition-shadow">
-      <div className="text-3xl mb-2">{icon}</div>
-      <div className="font-extrabold text-slate-900 text-2xl mb-0.5">{value}</div>
-      <div className="text-slate-500 text-sm">{label}</div>
+    <div className="glass glass-hover rounded-xl p-5 text-center">
+      <div className="text-2xl mb-2">{icon}</div>
+      <div className="font-display font-bold text-xl mb-0.5" style={{ color: "var(--text-primary)" }}>{value}</div>
+      <div className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{label}</div>
     </div>
   );
 }
 
 function StepCard({ number, icon, title, description }) {
   return (
-    <div className="relative bg-white border border-slate-200 rounded-2xl p-8 text-center hover:shadow-lg transition-shadow">
-      <div className="absolute -top-3 -left-3 w-8 h-8 bg-blue-600 rounded-full text-white font-black text-sm flex items-center justify-center shadow-lg">
+    <div className="glass glass-hover rounded-xl p-7 text-center relative">
+      <div className="absolute -top-3 -left-3 w-7 h-7 rounded-full flex items-center justify-center text-xs font-mono font-bold text-black"
+        style={{ background: "linear-gradient(135deg, var(--accent), #7C3AED)" }}>
         {number}
       </div>
-      <div className="text-4xl mb-4">{icon}</div>
-      <h3 className="font-bold text-slate-900 text-lg mb-2">{title}</h3>
-      <p className="text-slate-500 text-sm leading-relaxed">{description}</p>
+      <div className="text-3xl mb-4">{icon}</div>
+      <h3 className="font-display font-bold text-base mb-2" style={{ color: "var(--text-primary)" }}>{title}</h3>
+      <p className="text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>{description}</p>
     </div>
   );
 }
 
 export default function HomePage({ navigate }) {
-  const [conversionCount] = useState(
-    () => 47382 + Math.floor(Math.random() * 1000)
-  );
+  const [count] = useState(() => 47382 + Math.floor(Math.random() * 1000));
 
   return (
     <main>
       {/* ── Hero ─────────────────────────────────────────── */}
-      <section className="relative bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white py-24 px-4 overflow-hidden">
-        {/* Dot grid background */}
-        <div
-          className="absolute inset-0 opacity-10 pointer-events-none"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.4) 1px, transparent 0)",
-            backgroundSize: "40px 40px",
-          }}
-        />
+      <section className="relative overflow-hidden py-28 px-4" style={{ background: "var(--bg-base)" }}>
+
+        {/* Grid background */}
+        <div className="absolute inset-0 bg-grid-pattern bg-grid opacity-100 pointer-events-none" />
+
+        {/* Gradient orbs */}
+        <div className="absolute top-0 left-1/4 w-96 h-96 rounded-full pointer-events-none animate-glow-pulse"
+          style={{ background: "radial-gradient(circle, rgba(0,212,255,0.08) 0%, transparent 70%)", filter: "blur(40px)" }} />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 rounded-full pointer-events-none animate-glow-pulse"
+          style={{ background: "radial-gradient(circle, rgba(124,58,237,0.08) 0%, transparent 70%)", filter: "blur(40px)", animationDelay: "1.5s" }} />
 
         <div className="max-w-4xl mx-auto text-center relative">
-          {/* Pill badge */}
-          <div className="inline-flex items-center gap-2 bg-blue-500/20 border border-blue-400/30 rounded-full px-4 py-1.5 text-sm text-blue-300 mb-8 font-medium">
-            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-mono mb-8 animate-fade-up"
+            style={{ background: "rgba(0,212,255,0.08)", border: "1px solid rgba(0,212,255,0.2)", color: "var(--accent)" }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             Free Online File Converter — No signup required
           </div>
 
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-5 leading-tight tracking-tight">
-            Convert Files{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">
-              Instantly
-            </span>
-            <br />
-            100% Free
+          {/* H1 */}
+          <h1 className="font-display font-bold leading-tight tracking-tight mb-6 animate-fade-up animate-delay-100"
+            style={{ fontSize: "clamp(2.5rem, 7vw, 4.5rem)", color: "var(--text-primary)" }}>
+            Convert Any File{" "}
+            <span className="text-gradient">Instantly</span>
+            <br />Zero Cost. Zero Signup.
           </h1>
 
-          <p className="text-slate-300 text-lg sm:text-xl mb-10 max-w-2xl mx-auto leading-relaxed">
-            PDF, Word, JPG, PNG — convert between any format in seconds. No
-            installation, no watermarks, no limits.
+          <p className="text-lg leading-relaxed max-w-2xl mx-auto mb-10 animate-fade-up animate-delay-200"
+            style={{ color: "var(--text-muted)" }}>
+            18 powerful conversion tools — PDF, Word, Excel, PowerPoint, Images and more.
+            Process files in seconds, directly in your browser.
           </p>
 
-          {/* Tool chips */}
-          <div className="flex flex-wrap items-center justify-center gap-2.5 mb-8">
-            {["PDF → Word", "Word → PDF", "JPG → PDF", "Merge PDF", "Compress PDF"].map(
-              (t) => (
-                <span
-                  key={t}
-                  className="bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-sm font-medium"
-                >
-                  {t}
-                </span>
-              )
-            )}
+          {/* Feature chips */}
+          <div className="flex flex-wrap justify-center gap-2 mb-10 animate-fade-up animate-delay-300">
+            {["PDF → Word","Word → PDF","JPG → PDF","Merge PDF","Compress PDF","Remove Background"].map(t => (
+              <span key={t} className="text-xs font-mono px-3 py-1.5 rounded-full"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)", color: "var(--text-muted)" }}>
+                {t}
+              </span>
+            ))}
           </div>
 
-          <button
-            onClick={() => navigate("/tools")}
-            className="px-10 py-4 bg-gradient-to-r from-blue-500 to-violet-500 text-white font-bold rounded-2xl shadow-2xl hover:from-blue-600 hover:to-violet-600 transition-all hover:shadow-blue-500/30 text-lg active:scale-95"
-          >
-            Browse All Tools →
-          </button>
+          {/* CTAs */}
+          <div className="flex flex-wrap items-center justify-center gap-3 animate-fade-up animate-delay-400">
+            <button onClick={() => navigate("/tools")}
+              className="btn-electric px-8 py-3.5 text-sm font-bold rounded-xl">
+              Browse All 18 Tools →
+            </button>
+            <button onClick={() => navigate("/tools/cat/pdf")}
+              className="btn-ghost px-6 py-3.5 text-sm rounded-xl">
+              PDF Tools
+            </button>
+          </div>
         </div>
       </section>
 
-      {/* ── Top Ad ───────────────────────────────────────── */}
+      {/* ── Ad ────────────────────────────────────────────── */}
       <div className="max-w-6xl mx-auto px-4">
         <AdBanner variant="horizontal" />
       </div>
 
       {/* ── Tool Grid ─────────────────────────────────────── */}
       <section className="max-w-6xl mx-auto px-4 py-16">
-        <h2 className="font-extrabold text-slate-900 text-3xl sm:text-4xl text-center mb-2">
-          All Conversion Tools
-        </h2>
-        <p className="text-slate-500 text-center text-lg mb-10">
-          Select a tool to get started — all free, all instant
-        </p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {TOOL_LIST.map((tool) => (
+        <div className="text-center mb-12">
+          <p className="text-xs font-mono uppercase tracking-widest mb-3" style={{ color: "var(--accent)" }}>
+            ◈ Conversion Tools
+          </p>
+          <h2 className="font-display font-bold text-3xl sm:text-4xl mb-3" style={{ color: "var(--text-primary)" }}>
+            All 18 Tools — All Free
+          </h2>
+          <p className="text-base" style={{ color: "var(--text-muted)" }}>
+            Select a tool to get started — instant, no signup
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {TOOL_LIST.map(tool => (
             <ToolCard key={tool.id} tool={tool} navigate={navigate} />
           ))}
         </div>
       </section>
 
-      {/* ── Mid Ad ────────────────────────────────────────── */}
+      {/* ── Ad ────────────────────────────────────────────── */}
       <div className="max-w-6xl mx-auto px-4">
         <AdBanner variant="horizontal" />
       </div>
 
-      {/* ── How It Works ──────────────────────────────────── */}
-      <section className="bg-slate-50 py-20 px-4">
+      {/* ── How it works ──────────────────────────────────── */}
+      <section className="py-20 px-4" style={{ background: "var(--bg-surface)" }}>
         <div className="max-w-4xl mx-auto">
-          <h2 className="font-extrabold text-slate-900 text-3xl text-center mb-2">
-            How It Works
-          </h2>
-          <p className="text-slate-500 text-center mb-12">
-            Convert your files in 3 simple steps
-          </p>
-
+          <div className="text-center mb-12">
+            <p className="text-xs font-mono uppercase tracking-widest mb-3" style={{ color: "var(--accent)" }}>
+              ◈ How It Works
+            </p>
+            <h2 className="font-display font-bold text-3xl" style={{ color: "var(--text-primary)" }}>
+              3 Steps to Convert
+            </h2>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <StepCard
-              number="1"
-              icon="📁"
-              title="Upload Your File"
-              description="Drag & drop or click to select your file from any device."
-            />
-            <StepCard
-              number="2"
-              icon="⚡"
-              title="We Convert It"
-              description="Our servers process your file instantly with no quality loss."
-            />
-            <StepCard
-              number="3"
-              icon="⬇️"
-              title="Download Result"
-              description="Your converted file is ready. Download and done!"
-            />
+            <StepCard number="1" icon="📁" title="Upload Your File"
+              description="Drag & drop or click to select your file from any device." />
+            <StepCard number="2" icon="⚡" title="Instant Processing"
+              description="Our servers convert your file instantly with no quality loss." />
+            <StepCard number="3" icon="⬇️" title="Download Result"
+              description="Your converted file is ready. Download in one click." />
           </div>
         </div>
       </section>
 
-      {/* ── Trust Signals ─────────────────────────────────── */}
+      {/* ── Trust stats ───────────────────────────────────── */}
       <section className="max-w-6xl mx-auto px-4 py-16">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-          <TrustBadge
-            icon="📊"
-            value={conversionCount.toLocaleString() + "+"}
-            label="Files Converted"
-          />
-          <TrustBadge icon="🎁" value="100%" label="Free Forever" />
-          <TrustBadge icon="⚡" value="< 10s" label="Average Speed" />
-          <TrustBadge icon="🔒" value="256-bit" label="SSL Secured" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <TrustCard icon="📊" value={count.toLocaleString()+"+"} label="Files Converted" />
+          <TrustCard icon="🎁" value="100%"    label="Free Forever"  />
+          <TrustCard icon="⚡" value="< 10s"   label="Average Speed" />
+          <TrustCard icon="🔒" value="256-bit" label="SSL Secured"   />
         </div>
       </section>
 
-      {/* ── SEO Content ───────────────────────────────────── */}
+      {/* ── SEO content ───────────────────────────────────── */}
       <section className="max-w-3xl mx-auto px-4 pb-20">
-        <h2 className="font-extrabold text-slate-900 text-2xl mb-4">
+        <hr className="divider mb-12" />
+        <h2 className="font-display font-bold text-2xl mb-4" style={{ color: "var(--text-primary)" }}>
           Free Online File Converter
         </h2>
-        <p className="text-slate-600 leading-relaxed mb-4">
-          FileConvert is the fastest and most reliable free online file
-          converter. Whether you need to convert PDF to Word, compress a PDF,
-          merge multiple PDFs, or convert images to PDF, we have the tool for
-          you — completely free.
+        <p className="leading-relaxed mb-4 text-sm" style={{ color: "var(--text-muted)" }}>
+          FileConvert is the fastest and most reliable free online file converter. Whether you need to
+          convert PDF to Word, compress a PDF, merge multiple PDFs, or convert images — all 18 tools
+          are completely free with no registration required.
         </p>
-        <p className="text-slate-600 leading-relaxed">
-          Unlike other converters, we don't require registration, don't add
-          watermarks, and don't limit your conversions. Your files are processed
-          on secure servers and automatically deleted after 1 hour. Start
-          converting your files today!
+        <p className="leading-relaxed text-sm" style={{ color: "var(--text-muted)" }}>
+          Your files are processed on secure servers and automatically deleted after 1 hour. No
+          watermarks, no limits, no hidden fees.
         </p>
       </section>
     </main>

@@ -5,23 +5,20 @@ import AdBanner from "../components/AdBanner";
 import { TOOL_LIST, PDF_TOOLS, IMAGE_TOOLS } from "../data/tools";
 
 const CATEGORIES = [
-  { key: "all",   label: "All Tools",   tools: TOOL_LIST   },
-  { key: "pdf",   label: "PDF Tools",   tools: PDF_TOOLS   },
-  { key: "image", label: "Image Tools", tools: IMAGE_TOOLS },
+  { key: "all",   label: "All Tools",   count: TOOL_LIST.length,   tools: TOOL_LIST   },
+  { key: "pdf",   label: "PDF Tools",   count: PDF_TOOLS.length,   tools: PDF_TOOLS   },
+  { key: "image", label: "Image Tools", count: IMAGE_TOOLS.length, tools: IMAGE_TOOLS },
 ];
 
 export default function ToolsPage({ navigate, initialCategory = "all" }) {
-  const [activeCategory, setActiveCategory] = useState(initialCategory);
+  const [active, setActive] = useState(initialCategory);
 
-  useEffect(() => {
-    setActiveCategory(initialCategory);
-  }, [initialCategory]);
+  useEffect(() => { setActive(initialCategory); }, [initialCategory]);
 
-  const activeCat =
-    CATEGORIES.find((c) => c.key === activeCategory) || CATEGORIES[0];
+  const cat = CATEGORIES.find(c => c.key === active) || CATEGORIES[0];
 
-  const PAGE_TITLES = {
-    all:   "All File Conversion Tools",
+  const TITLES = {
+    all:   "All Conversion Tools",
     pdf:   "PDF Conversion Tools",
     image: "Image Conversion Tools",
   };
@@ -29,10 +26,13 @@ export default function ToolsPage({ navigate, initialCategory = "all" }) {
   return (
     <main className="max-w-6xl mx-auto px-4 py-14">
       <div className="text-center mb-10">
-        <h1 className="font-extrabold text-slate-900 text-4xl mb-2">
-          {PAGE_TITLES[activeCategory] || PAGE_TITLES.all}
+        <p className="text-xs font-mono uppercase tracking-widest mb-3" style={{ color: "var(--accent)" }}>
+          ◈ {cat.count} Tools Available
+        </p>
+        <h1 className="font-display font-bold text-4xl mb-2" style={{ color: "var(--text-primary)" }}>
+          {TITLES[active]}
         </h1>
-        <p className="text-slate-500 text-lg">
+        <p className="text-base" style={{ color: "var(--text-muted)" }}>
           Free online converters — no signup, no watermarks
         </p>
       </div>
@@ -40,31 +40,28 @@ export default function ToolsPage({ navigate, initialCategory = "all" }) {
       <AdBanner variant="horizontal" />
 
       {/* Category tabs */}
-      <div className="flex gap-2 mb-8 mt-6 flex-wrap">
-        {CATEGORIES.map((cat) => (
-          <button
-            key={cat.key}
+      <div className="flex gap-2 mt-6 mb-8 flex-wrap">
+        {CATEGORIES.map(c => (
+          <button key={c.key}
             onClick={() => {
-              setActiveCategory(cat.key);
-              const p = cat.key === "all" ? "/tools" : `/tools/cat/${cat.key}`;
-              navigate(p);
+              setActive(c.key);
+              navigate(c.key === "all" ? "/tools" : `/tools/cat/${c.key}`);
             }}
-            className={`px-5 py-2 rounded-full text-sm font-semibold transition-all ${
-              activeCategory === cat.key
-                ? "bg-blue-600 text-white shadow-md"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            {cat.label}
-            <span className={`ml-1.5 text-xs ${activeCategory === cat.key ? "text-blue-200" : "text-slate-400"}`}>
-              ({cat.tools.length})
-            </span>
+            className="px-5 py-2 rounded-full text-sm font-mono font-medium transition-all duration-200"
+            style={{
+              background: active === c.key ? "var(--accent)" : "rgba(255,255,255,0.04)",
+              color:      active === c.key ? "#000"         : "var(--text-muted)",
+              border:     active === c.key ? "1px solid var(--accent)" : "1px solid var(--border)",
+              boxShadow:  active === c.key ? "0 4px 16px rgba(0,212,255,0.25)" : "none",
+            }}>
+            {c.label}
+            <span className="ml-2 text-xs opacity-70">({c.count})</span>
           </button>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {activeCat.tools.map((tool) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        {cat.tools.map(tool => (
           <ToolCard key={tool.id} tool={tool} navigate={navigate} />
         ))}
       </div>

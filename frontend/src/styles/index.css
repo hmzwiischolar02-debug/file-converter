@@ -1,31 +1,115 @@
-/* src/styles/index.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ── Base resets ───────────────────────────────────────── */
+/* ── Design tokens ─────────────────────────────────────── */
+:root {
+  --bg-base:        #07090F;
+  --bg-surface:     #0D1117;
+  --bg-card:        rgba(255,255,255,0.03);
+  --border:         rgba(255,255,255,0.07);
+  --border-hover:   rgba(0,212,255,0.35);
+  --border-active:  rgba(0,212,255,0.6);
+  --text-primary:   #F1F5F9;
+  --text-muted:     #64748B;
+  --text-subtle:    #334155;
+  --accent:         #00D4FF;
+  --accent-dim:     #00A8CC;
+  --accent-glow:    rgba(0,212,255,0.15);
+  --violet:         #7C3AED;
+}
+
+/* ── Base ───────────────────────────────────────────────── */
 @layer base {
   html {
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-
   body {
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    @apply text-slate-900 bg-white;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+  }
+  * { box-sizing: border-box; }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg-surface); }
+  ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent-dim); }
+
+  /* Selection */
+  ::selection { background: rgba(0,212,255,0.2); color: #fff; }
+}
+
+/* ── Glass card ─────────────────────────────────────────── */
+@layer components {
+  .glass {
+    background:    var(--bg-card);
+    border:        1px solid var(--border);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .glass-hover {
+    transition: all 0.2s ease;
+  }
+  .glass-hover:hover {
+    border-color:  var(--border-hover);
+    box-shadow:    0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,212,255,0.15);
+    transform:     translateY(-2px);
   }
 
-  button {
-    font-family: inherit;
+  /* Electric button */
+  .btn-electric {
+    background:    linear-gradient(135deg, var(--accent), var(--accent-dim));
+    color:         #000;
+    font-weight:   700;
+    border-radius: 0.75rem;
+    transition:    all 0.2s ease;
+    box-shadow:    0 4px 16px rgba(0,212,255,0.25);
+  }
+  .btn-electric:hover {
+    box-shadow:    0 6px 28px rgba(0,212,255,0.45);
+    transform:     translateY(-1px);
+  }
+  .btn-electric:active { transform: scale(0.97); }
+
+  /* Ghost button */
+  .btn-ghost {
+    background:    transparent;
+    border:        1px solid var(--border);
+    color:         var(--text-muted);
+    font-weight:   500;
+    border-radius: 0.75rem;
+    transition:    all 0.2s ease;
+  }
+  .btn-ghost:hover {
+    border-color:  var(--border-hover);
+    color:         var(--text-primary);
+    background:    rgba(0,212,255,0.05);
   }
 
-  * {
-    box-sizing: border-box;
+  /* Accent text */
+  .text-electric {
+    color: var(--accent);
+  }
+  .text-gradient {
+    background: linear-gradient(135deg, var(--accent), #7C3AED);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Section divider */
+  .divider {
+    border: none;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
   }
 }
 
-/* ── Custom utilities ──────────────────────────────────── */
+/* ── Utilities ──────────────────────────────────────────── */
 @layer utilities {
   .line-clamp-2 {
     overflow: hidden;
@@ -33,47 +117,13 @@
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
   }
+  .animate-delay-100 { animation-delay: 0.1s; }
+  .animate-delay-200 { animation-delay: 0.2s; }
+  .animate-delay-300 { animation-delay: 0.3s; }
+  .animate-delay-400 { animation-delay: 0.4s; }
+  .animate-delay-500 { animation-delay: 0.5s; }
 
-  .line-clamp-3 {
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 3;
+  .glow-electric {
+    box-shadow: 0 0 20px rgba(0,212,255,0.3), 0 0 60px rgba(0,212,255,0.1);
   }
-}
-
-/* ── Custom animations ─────────────────────────────────── */
-@layer utilities {
-  .animate-fade-in {
-    animation: fadeIn 0.3s ease-out both;
-  }
-
-  .animate-slide-up {
-    animation: slideUp 0.4s ease-out both;
-  }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-/* ── Scrollbar ─────────────────────────────────────────── */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  @apply bg-slate-100;
-}
-::-webkit-scrollbar-thumb {
-  @apply bg-slate-300 rounded-full;
-}
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-400;
 }
