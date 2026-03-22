@@ -1,43 +1,21 @@
-// src/components/ProgressBar.jsx
-const MSGS = ["Uploading file…","Analysing content…","Converting format…","Optimising output…","Almost done…"];
-
+const MSGS = ["Uploading…","Analysing content…","Converting…","Optimising…","Almost done…"];
 export default function ProgressBar({ progress, tool }) {
-  const msgIdx = Math.min(Math.floor(progress / 20), MSGS.length - 1);
-
+  const idx = Math.min(Math.floor(progress / 20), 4);
   return (
     <div className="text-center py-12">
-      <div className="text-5xl mb-6 animate-float">{tool.emoji}</div>
-      <h3 className="font-display font-bold text-xl mb-1" style={{ color: "var(--text-primary)" }}>
-        Converting your file…
-      </h3>
-      <p className="text-sm font-mono mb-8" style={{ color: "var(--text-muted)" }}>
-        {MSGS[msgIdx]}
-      </p>
-
-      {/* Progress bar */}
+      <div className="text-5xl mb-5 animate-bounce">{tool.emoji}</div>
+      <h3 className="font-bold text-slate-800 text-xl mb-1">Converting your file…</h3>
+      <p className="text-slate-500 text-sm mb-8">{MSGS[idx]}</p>
       <div className="max-w-xs mx-auto">
-        <div className="h-1.5 rounded-full overflow-hidden"
-          style={{ background: "rgba(255,255,255,0.06)" }}>
-          <div className="h-full rounded-full transition-all duration-500 ease-out relative"
-            style={{
-              width: `${progress}%`,
-              background: `linear-gradient(90deg, ${tool.color}88, ${tool.color}, var(--accent))`,
-              boxShadow: `0 0 10px ${tool.color}66`,
-            }}>
-            {/* Moving glow dot */}
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full"
-              style={{ background: "#fff", boxShadow: `0 0 6px ${tool.color}` }} />
-          </div>
+        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+          <div className="h-full rounded-full transition-all duration-500 ease-out"
+            style={{ width: `${progress}%`, background: `linear-gradient(90deg, ${tool.color}88, ${tool.color})` }} />
         </div>
-        <div className="flex justify-between mt-2">
-          <span className="text-xs font-mono" style={{ color: "var(--text-subtle)" }}>{MSGS[msgIdx]}</span>
-          <span className="text-xs font-mono" style={{ color: "var(--accent)" }}>{Math.round(progress)}%</span>
+        <div className="flex justify-between mt-2 text-xs text-slate-400">
+          <span>{MSGS[idx]}</span><span>{Math.round(progress)}%</span>
         </div>
       </div>
-
-      <p className="text-xs font-mono mt-6" style={{ color: "var(--text-subtle)" }}>
-        Usually takes under 10 seconds
-      </p>
+      <p className="text-xs text-slate-400 mt-6">Usually takes under 10 seconds</p>
     </div>
   );
 }

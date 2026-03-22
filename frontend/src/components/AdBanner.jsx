@@ -1,25 +1,9 @@
-// src/components/AdBanner.jsx
-const SIZES = {
-  horizontal: "h-20",
-  square:     "h-60",
-  sidebar:    "h-48",
-};
-
+const H = { horizontal: "h-20", square: "h-56", sidebar: "h-44" };
 export default function AdBanner({ variant = "horizontal", className = "" }) {
   return (
-    <div className={`w-full ${SIZES[variant]} ${className} rounded-xl flex items-center justify-center gap-3 my-5`}
-      style={{
-        background: "rgba(255,255,255,0.02)",
-        border: "1px dashed rgba(255,255,255,0.08)",
-      }}>
-      <span className="text-xs font-mono uppercase tracking-widest"
-        style={{ color: "var(--text-subtle)" }}>
-        ◈ Advertisement
-      </span>
-      <span className="text-xs px-2 py-0.5 rounded font-mono"
-        style={{ background: "rgba(0,212,255,0.08)", color: "var(--accent)", border: "1px solid rgba(0,212,255,0.15)" }}>
-        AdSense
-      </span>
+    <div className={`w-full ${H[variant]} ${className} my-5 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl flex items-center justify-center gap-3 text-slate-400 text-sm font-medium`}>
+      <span>📢</span><span>Advertisement</span>
+      <span className="text-xs bg-slate-200 text-slate-500 px-2 py-0.5 rounded">Google AdSense</span>
     </div>
   );
 }

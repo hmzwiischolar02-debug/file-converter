@@ -1,42 +1,14 @@
-// src/components/ToolCard.jsx
 export default function ToolCard({ tool, navigate, size = "default" }) {
   const compact = size === "compact";
-
   return (
     <button onClick={() => navigate(`/tool/${tool.id}`)}
-      className="group text-left w-full rounded-xl transition-all duration-200 glass glass-hover focus:outline-none"
-      style={{ padding: compact ? "14px 16px" : "20px" }}>
-
-      {/* Top: emoji + arrow */}
-      <div className="flex items-start justify-between mb-3">
-        <span style={{ fontSize: compact ? "22px" : "28px" }}>{tool.emoji}</span>
-        <span className="opacity-0 group-hover:opacity-100 transition-all duration-200 text-xs font-mono translate-x-0 group-hover:translate-x-1"
-          style={{ color: "var(--accent)" }}>→</span>
-      </div>
-
-      {/* Name */}
-      <p className="font-display font-bold mb-1.5"
-        style={{ fontSize: compact ? "13px" : "15px", color: "var(--text-primary)" }}>
-        {tool.name}
-      </p>
-
-      {/* Description */}
-      <p className="line-clamp-2 leading-relaxed"
-        style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-        {tool.description}
-      </p>
-
-      {/* Bottom tag */}
-      <div className="mt-3 flex items-center gap-1.5">
-        <span className="text-xs px-2 py-0.5 rounded-full font-mono"
-          style={{
-            background: `${tool.color}18`,
-            color: tool.color,
-            border: `1px solid ${tool.color}30`,
-            fontSize: "10px",
-          }}>
-          {tool.from} → {tool.to}
-        </span>
+      className="group text-left w-full bg-white border-2 border-slate-200 hover:border-slate-300 rounded-2xl transition-all duration-200 hover:shadow-xl hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+      style={{ padding: compact ? "16px" : "22px" }}>
+      <div style={{ fontSize: compact ? "26px" : "32px" }} className="mb-3">{tool.emoji}</div>
+      <h3 className="font-bold text-slate-900 mb-1.5" style={{ fontSize: compact ? "13px" : "15px" }}>{tool.name}</h3>
+      <p className="text-slate-500 leading-relaxed line-clamp-2" style={{ fontSize: "13px" }}>{tool.description}</p>
+      <div className="mt-3 flex items-center gap-1 text-xs font-semibold" style={{ color: tool.color }}>
+        Convert now <span className="group-hover:translate-x-1 transition-transform inline-block">→</span>
       </div>
     </button>
   );
