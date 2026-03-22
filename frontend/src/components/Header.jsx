@@ -5,13 +5,14 @@ export default function Header({ navigate, currentPath }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const navLinks = [
-    { label: "All Tools",   path: "/tools",           cat: "all"   },
-    { label: "PDF Tools",   path: "/tools/cat/pdf",   cat: "pdf"   },
-    { label: "Image Tools", path: "/tools/cat/image", cat: "image" },
+    { label: "All Tools",   path: "/tools"           },
+    { label: "PDF Tools",   path: "/tools/cat/pdf"   },
+    { label: "Image Tools", path: "/tools/cat/image" },
   ];
 
-  const isActive = (path) =>
-    currentPath === path || currentPath.startsWith(path.split("/cat/")[0] + "/cat/") && path === currentPath;
+  const isActive = (linkPath) =>
+    currentPath === linkPath ||
+    (linkPath !== "/tools" && currentPath.startsWith(linkPath));
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-slate-100 shadow-sm">
@@ -53,12 +54,9 @@ export default function Header({ navigate, currentPath }) {
             <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
             Free Forever
           </span>
-
-          {/* Mobile menu toggle */}
           <button
             className="md:hidden p-2 text-slate-600 hover:text-slate-900"
             onClick={() => setMobileOpen(!mobileOpen)}
-            aria-label="Toggle menu"
           >
             {mobileOpen ? "✕" : "☰"}
           </button>
@@ -71,11 +69,12 @@ export default function Header({ navigate, currentPath }) {
           {navLinks.map((link) => (
             <button
               key={link.label}
-              onClick={() => {
-                navigate(link.path);
-                setMobileOpen(false);
-              }}
-              className="text-left py-2.5 px-3 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+              onClick={() => { navigate(link.path); setMobileOpen(false); }}
+              className={`text-left py-2.5 px-3 text-sm font-medium rounded-lg transition-all ${
+                isActive(link.path)
+                  ? "text-blue-600 bg-blue-50"
+                  : "text-slate-700 hover:text-blue-600 hover:bg-blue-50"
+              }`}
             >
               {link.label}
             </button>

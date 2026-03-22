@@ -3,13 +3,13 @@ import { useState } from "react";
 import { useRouter } from "./hooks/useRouter";
 import { TOOLS } from "./data/tools";
 
-import StatsBar from "./components/StatsBar";
-import Header from "./components/Header";
-import Footer from "./components/Footer";
+import StatsBar    from "./components/StatsBar";
+import Header      from "./components/Header";
+import Footer      from "./components/Footer";
 
-import HomePage from "./pages/HomePage";
-import ToolsPage from "./pages/ToolsPage";
-import ToolPage from "./pages/ToolPage";
+import HomePage     from "./pages/HomePage";
+import ToolsPage    from "./pages/ToolsPage";
+import ToolPage     from "./pages/ToolPage";
 import NotFoundPage from "./pages/NotFoundPage";
 
 export default function App() {
@@ -19,17 +19,25 @@ export default function App() {
   );
 
   const renderPage = () => {
+    // Home
     if (path === "/" || path === "") {
       return <HomePage navigate={navigate} />;
     }
 
-    if (path === "/tools" || path.startsWith("/tools/cat/")) {
-      const cat = path.startsWith("/tools/cat/") ? path.split("/tools/cat/")[1] : "all";
+    // All tools
+    if (path === "/tools") {
+      return <ToolsPage navigate={navigate} initialCategory="all" />;
+    }
+
+    // Category filtered tools
+    if (path.startsWith("/tools/cat/")) {
+      const cat = path.split("/tools/cat/")[1];
       return <ToolsPage navigate={navigate} initialCategory={cat} />;
     }
 
+    // Individual tool page
     if (path.startsWith("/tool/")) {
-      const toolId = path.slice(6);
+      const toolId = path.split("/tool/")[1];
       if (TOOLS[toolId]) {
         return <ToolPage key={toolId} toolId={toolId} navigate={navigate} />;
       }
