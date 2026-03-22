@@ -27,6 +27,12 @@ async function callAPI(toolId, files, extras = {}) {
   }
 
   if (!res.ok) {
+    // Rate limit exceeded
+    if (res.status === 429) {
+      throw new Error(
+        "Too many conversions. Please wait a minute and try again."
+      );
+    }
     let detail = `Server error (${res.status})`;
     try {
       const json = await res.json();

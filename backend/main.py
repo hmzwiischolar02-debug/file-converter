@@ -28,6 +28,10 @@ from typing import List
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 UPLOAD_DIR = Path(tempfile.gettempdir()) / "fileconvert"
@@ -45,6 +49,16 @@ app = FastAPI(
     description="Free online file converter — PDF, Word, Images",
     version="2.0.0",
 )
+
+# ── Rate limiting ──────────────────────────────────────────────────────────────
+# Free tier limits: 10 conversions per minute per IP
+# Adjust via RATE_LIMIT env var e.g. "20/minute"
+RATE_LIMIT = os.getenv("RATE_LIMIT", "10/minute")
+
+limiter = Limiter(key_func=get_remote_address, default_limits=[RATE_LIMIT])
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -181,25 +195,28 @@ def do_word_to_pdf(docx_bytes: bytes, original_name: str) -> bytes:
     logger = logging.getLogger("fileconvert")
     suffix = Path(original_name).suffix.lower()
 
-    # ── 1. docx2pdf — uses MS Word COM on Windows (PERFECT) ───────────────────
-    try:
-        from docx2pdf import convert as d2p
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-            tmp.write(docx_bytes)
-            src = tmp.name
-        dst = src.replace(suffix, ".pdf")
+    # ── 1. docx2pdf — only works on Windows/macOS with MS Word installed ────────
+    # Skipped on Linux (Railway/Render) where MS Word is not available
+    import platform
+    if platform.system() in ("Windows", "Darwin"):
         try:
-            d2p(src, dst)
-            if Path(dst).exists() and Path(dst).stat().st_size > 100:
-                logger.info("word-to-pdf: docx2pdf (MS Word)")
-                return Path(dst).read_bytes()
-        finally:
-            Path(src).unlink(missing_ok=True)
-            Path(dst).unlink(missing_ok=True)
-    except ImportError:
-        pass
-    except Exception as e:
-        logger.warning(f"word-to-pdf: docx2pdf failed — {e}")
+            from docx2pdf import convert as d2p
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                tmp.write(docx_bytes)
+                src = tmp.name
+            dst = src.replace(suffix, ".pdf")
+            try:
+                d2p(src, dst)
+                if Path(dst).exists() and Path(dst).stat().st_size > 100:
+                    logger.info("word-to-pdf: docx2pdf (MS Word)")
+                    return Path(dst).read_bytes()
+            finally:
+                Path(src).unlink(missing_ok=True)
+                Path(dst).unlink(missing_ok=True)
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.warning(f"word-to-pdf: docx2pdf failed — {e}")
 
     # ── 2. LibreOffice CLI (Linux / macOS) ────────────────────────────────────
     try:
@@ -892,15 +909,17 @@ async def diagnostics():
     except ImportError:
         results["PyMuPDF"] = {"available": False, "note": "❌ Run: pip install PyMuPDF"}
 
-    # Determine active Word→PDF method
-    if results["docx2pdf"]["available"]:
+    # Determine active Word→PDF method (docx2pdf only works on Windows/macOS)
+    import platform
+    is_windows_or_mac = platform.system() in ("Windows", "Darwin")
+    if is_windows_or_mac and results["docx2pdf"]["available"]:
         active = "docx2pdf (MS Word COM) — PERFECT quality"
-    elif results["mammoth"]["available"] and results["weasyprint"]["available"]:
-        active = "mammoth + weasyprint — GOOD quality"
     elif results["libreoffice"]["available"]:
         active = "LibreOffice — PERFECT quality"
+    elif results["mammoth"]["available"]:
+        active = "mammoth + xhtml2pdf — GOOD quality (active on this server)"
     else:
-        active = "❌ No good method available — install docx2pdf"
+        active = "❌ No method available — install mammoth + xhtml2pdf"
 
     return {
         "word_to_pdf_active_method": active,
@@ -923,8 +942,9 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 # ── 1. PDF → Word ──────────────────────────────────────────────────────────────
+@limiter.limit(RATE_LIMIT)
 @app.post("/convert/pdf-to-word")
-async def pdf_to_word(files: List[UploadFile] = File(...)):
+async def pdf_to_word(request: Request, files: List[UploadFile] = File(...)):
     f = files[0]
     validate("pdf-to-word", f.filename)
     raw = await f.read()
@@ -947,8 +967,9 @@ async def pdf_to_word(files: List[UploadFile] = File(...)):
 
 
 # ── 2. Word → PDF ──────────────────────────────────────────────────────────────
+@limiter.limit(RATE_LIMIT)
 @app.post("/convert/word-to-pdf")
-async def word_to_pdf(files: List[UploadFile] = File(...)):
+async def word_to_pdf(request: Request, files: List[UploadFile] = File(...)):
     f = files[0]
     fname = f.filename or "document.docx"
     validate("word-to-pdf", fname)
@@ -968,8 +989,9 @@ async def word_to_pdf(files: List[UploadFile] = File(...)):
 
 
 # ── 3. JPG/PNG → PDF ───────────────────────────────────────────────────────────
+@limiter.limit(RATE_LIMIT)
 @app.post("/convert/jpg-to-pdf")
-async def jpg_to_pdf(files: List[UploadFile] = File(...)):
+async def jpg_to_pdf(request: Request, files: List[UploadFile] = File(...)):
     if not files:
         raise HTTPException(422, "No files provided.")
 
@@ -994,8 +1016,9 @@ async def jpg_to_pdf(files: List[UploadFile] = File(...)):
 
 
 # ── 4. PDF → JPG ───────────────────────────────────────────────────────────────
+@limiter.limit(RATE_LIMIT)
 @app.post("/convert/pdf-to-jpg")
-async def pdf_to_jpg(files: List[UploadFile] = File(...)):
+async def pdf_to_jpg(request: Request, files: List[UploadFile] = File(...)):
     f = files[0]
     validate("pdf-to-jpg", f.filename)
     raw = await f.read()
@@ -1014,8 +1037,9 @@ async def pdf_to_jpg(files: List[UploadFile] = File(...)):
 
 
 # ── 5. PNG → ICO ───────────────────────────────────────────────────────────────
+@limiter.limit(RATE_LIMIT)
 @app.post("/convert/png-to-ico")
-async def png_to_ico(files: List[UploadFile] = File(...)):
+async def png_to_ico(request: Request, files: List[UploadFile] = File(...)):
     f = files[0]
     validate("png-to-ico", f.filename)
     raw = await f.read()
@@ -1034,8 +1058,9 @@ async def png_to_ico(files: List[UploadFile] = File(...)):
 
 
 # ── 6. Merge PDFs ──────────────────────────────────────────────────────────────
+@limiter.limit(RATE_LIMIT)
 @app.post("/convert/merge-pdf")
-async def merge_pdf(files: List[UploadFile] = File(...)):
+async def merge_pdf(request: Request, files: List[UploadFile] = File(...)):
     if len(files) < 2:
         raise HTTPException(422, "Please upload at least 2 PDF files to merge.")
 
@@ -1059,8 +1084,9 @@ async def merge_pdf(files: List[UploadFile] = File(...)):
 
 
 # ── 7. Compress PDF ────────────────────────────────────────────────────────────
+@limiter.limit(RATE_LIMIT)
 @app.post("/convert/compress-pdf")
-async def compress_pdf(files: List[UploadFile] = File(...)):
+async def compress_pdf(request: Request, files: List[UploadFile] = File(...)):
     f = files[0]
     validate("compress-pdf", f.filename)
     raw = await f.read()
@@ -1091,8 +1117,9 @@ async def compress_pdf(files: List[UploadFile] = File(...)):
     )
 
 # ── 8. Excel → PDF ─────────────────────────────────────────────────────────────
+@limiter.limit(RATE_LIMIT)
 @app.post("/convert/excel-to-pdf")
-async def excel_to_pdf(files: List[UploadFile] = File(...)):
+async def excel_to_pdf(request: Request, files: List[UploadFile] = File(...)):
     f = files[0]
     ext = Path(f.filename or "").suffix.lower()
     if ext not in {".xls", ".xlsx"}:
@@ -1111,8 +1138,9 @@ async def excel_to_pdf(files: List[UploadFile] = File(...)):
 
 
 # ── 9. PPT → PDF ───────────────────────────────────────────────────────────────
+@limiter.limit(RATE_LIMIT)
 @app.post("/convert/ppt-to-pdf")
-async def ppt_to_pdf(files: List[UploadFile] = File(...)):
+async def ppt_to_pdf(request: Request, files: List[UploadFile] = File(...)):
     f = files[0]
     ext = Path(f.filename or "").suffix.lower()
     if ext not in {".ppt", ".pptx"}:
@@ -1131,8 +1159,9 @@ async def ppt_to_pdf(files: List[UploadFile] = File(...)):
 
 
 # ── 10. PDF → PNG ──────────────────────────────────────────────────────────────
+@limiter.limit(RATE_LIMIT)
 @app.post("/convert/pdf-to-png")
-async def pdf_to_png(files: List[UploadFile] = File(...)):
+async def pdf_to_png(request: Request, files: List[UploadFile] = File(...)):
     f = files[0]
     if Path(f.filename or "").suffix.lower() != ".pdf":
         raise HTTPException(422, "Please upload a .pdf file.")
@@ -1150,8 +1179,9 @@ async def pdf_to_png(files: List[UploadFile] = File(...)):
 
 
 # ── 11. Compress Image ─────────────────────────────────────────────────────────
+@limiter.limit(RATE_LIMIT)
 @app.post("/convert/compress-image")
-async def compress_image(files: List[UploadFile] = File(...)):
+async def compress_image(request: Request, files: List[UploadFile] = File(...)):
     f = files[0]
     ext = Path(f.filename or "").suffix.lower()
     if ext not in {".jpg", ".jpeg", ".png"}:
@@ -1181,8 +1211,10 @@ async def compress_image(files: List[UploadFile] = File(...)):
 
 
 # ── 12. Unlock PDF ─────────────────────────────────────────────────────────────
+@limiter.limit(RATE_LIMIT)
 @app.post("/convert/unlock-pdf")
 async def unlock_pdf(
+    request: Request,
     files: List[UploadFile] = File(...),
     password: str = "",
 ):
@@ -1200,4 +1232,3 @@ async def unlock_pdf(
     except Exception as e:
         raise HTTPException(500, f"PDF unlock failed: {e}")
     return stream(data, "unlocked.pdf", "application/pdf")
-
