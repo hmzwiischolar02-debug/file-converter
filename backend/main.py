@@ -889,127 +889,94 @@ def do_png_to_jpg(img_bytes: bytes) -> bytes:
 
 def do_html_to_pdf(html_bytes: bytes) -> bytes:
     """
-    HTML → PDF
-    Primary:  PyMuPDF (fitz.open with html story) — handles modern HTML well
-    Fallback: reportlab with basic text extraction
+    HTML → PDF using xhtml2pdf (reliable, pure Python, no hanging).
     """
+    from xhtml2pdf import pisa
+
     html_content = html_bytes.decode("utf-8", errors="replace")
 
-    # ── Primary: PyMuPDF HTML rendering ───────────────────────────────────────
-    try:
-        import fitz
-
-        # Ensure valid HTML structure
-        if "<html" not in html_content.lower():
-            html_content = f"""<!DOCTYPE html>
-<html><head><meta charset="UTF-8"/>
+    # Ensure valid full HTML document
+    if "<html" not in html_content.lower():
+        html_content = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"/>
 <style>
-  body {{ font-family: Arial, sans-serif; font-size: 12pt;
-         line-height: 1.6; margin: 2cm; color: #000; }}
-  h1 {{ font-size: 20pt; font-weight: bold; margin: 14pt 0 8pt; }}
-  h2 {{ font-size: 16pt; font-weight: bold; margin: 12pt 0 6pt; }}
-  table {{ border-collapse: collapse; width: 100%; }}
-  td, th {{ border: 1px solid #ccc; padding: 5pt 7pt; }}
-  th {{ background: #2563eb; color: white; font-weight: bold; }}
+  @page {{ margin: 2cm; }}
+  body {{ font-family: Helvetica, Arial, sans-serif; font-size: 11pt;
+          line-height: 1.6; color: #000; }}
+  h1 {{ font-size: 18pt; font-weight: bold; margin: 12pt 0 6pt; }}
+  h2 {{ font-size: 14pt; font-weight: bold; margin: 10pt 0 4pt; }}
+  h3 {{ font-size: 12pt; font-weight: bold; margin: 8pt 0 3pt; }}
+  p  {{ margin: 0 0 7pt; }}
+  table {{ border-collapse: collapse; width: 100%; margin: 8pt 0; }}
+  td, th {{ border: 1px solid #ccc; padding: 4pt 6pt; font-size: 9pt; }}
+  th {{ background-color: #2563eb; color: white; font-weight: bold; }}
+  ul, ol {{ margin: 0 0 7pt 16pt; }}
+  li {{ margin-bottom: 3pt; }}
+  strong, b {{ font-weight: bold; }}
+  em, i {{ font-style: italic; }}
 </style>
-</head><body>{html_content}</body></html>"""
-
-        # Write to temp file — PyMuPDF needs a file path for HTML
-        with tempfile.NamedTemporaryFile(suffix=".html", delete=False,
-                                         mode="w", encoding="utf-8") as tmp:
-            tmp.write(html_content)
-            tmp_path = tmp.name
-
-        try:
-            # Open as HTML story and render to PDF
-            doc = fitz.open()
-            with fitz.open(tmp_path) as html_doc:
-                for page in html_doc:
-                    doc.new_page(width=595, height=842)   # A4
-            # Use fitz Story for proper HTML rendering
-            story = fitz.Story(html_content, em=10)
-            mediabox = fitz.Rect(0, 0, 595, 842)
-            margins = (50, 50, 50, 50)  # left, top, right, bottom
-
-            writer = fitz.DocumentWriter(buf := io.BytesIO())
-            more = True
-            while more:
-                device = writer.begin_page(mediabox)
-                filled, more = story.place(mediabox + margins)
-                story.draw(device)
-                writer.end_page()
-            writer.close()
-            result = buf.getvalue()
-            if len(result) > 500:
-                return result
-        finally:
-            Path(tmp_path).unlink(missing_ok=True)
-
-    except Exception as e:
-        pass  # fall through to xhtml2pdf
-
-    # ── Fallback: xhtml2pdf ────────────────────────────────────────────────────
-    try:
-        from xhtml2pdf import pisa
-
-        # Add minimal styles if none present
+</head>
+<body>{html_content}</body>
+</html>"""
+    elif "<style" not in html_content.lower():
+        # Inject base styles into existing head
         base_style = """<style>
-          @page { margin: 2cm; }
-          body { font-family: Helvetica, Arial, sans-serif; font-size: 11pt;
-                 line-height: 1.6; color: #000; }
-          h1 { font-size: 18pt; font-weight: bold; margin: 12pt 0 6pt; }
-          h2 { font-size: 14pt; font-weight: bold; margin: 10pt 0 4pt; }
-          p  { margin: 0 0 7pt; }
-          table { border-collapse: collapse; width: 100%; margin: 8pt 0; }
-          td, th { border: 1px solid #ccc; padding: 4pt 6pt; font-size: 9pt; }
-          ul, ol { margin: 0 0 7pt 16pt; }
-        </style>"""
-
-        if "<style" not in html_content.lower():
-            if "<head>" in html_content:
-                html_content = html_content.replace("<head>", f"<head>{base_style}", 1)
-            else:
-                html_content = f"<html><head>{base_style}</head><body>{html_content}</body></html>"
-
-        buf = io.BytesIO()
-        status = pisa.CreatePDF(html_content, dest=buf, encoding="utf-8")
-        if not status.err:
-            return buf.getvalue()
-    except Exception:
-        pass
-
-    # ── Last resort: extract text with BeautifulSoup + reportlab ──────────────
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.units import cm
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-    from reportlab.lib import colors
-    import re
-
-    # Strip HTML tags
-    text = re.sub(r'<[^>]+>', ' ', html_content)
-    text = re.sub(r'&nbsp;', ' ', text)
-    text = re.sub(r'&amp;', '&', text)
-    text = re.sub(r'&lt;', '<', text)
-    text = re.sub(r'&gt;', '>', text)
-    text = re.sub(r'\s+', ' ', text).strip()
+  @page { margin: 2cm; }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 11pt;
+         line-height: 1.6; color: #000; }
+  h1 { font-size: 18pt; font-weight: bold; margin: 12pt 0 6pt; }
+  h2 { font-size: 14pt; font-weight: bold; margin: 10pt 0 4pt; }
+  p  { margin: 0 0 7pt; }
+  table { border-collapse: collapse; width: 100%; margin: 8pt 0; }
+  td, th { border: 1px solid #ccc; padding: 4pt 6pt; font-size: 9pt; }
+  th { background-color: #2563eb; color: white; font-weight: bold; }
+  ul, ol { margin: 0 0 7pt 16pt; }
+</style>"""
+        html_content = html_content.replace("</head>", base_style + "</head>", 1)
 
     buf = io.BytesIO()
-    styles = getSampleStyleSheet()
-    body = ParagraphStyle("B", parent=styles["Normal"], fontSize=11, leading=17)
-    doc = SimpleDocTemplate(buf, pagesize=A4,
-                            leftMargin=2.5*cm, rightMargin=2.5*cm,
-                            topMargin=2.5*cm, bottomMargin=2.5*cm)
-    story = []
-    for para in text.split(". "):
-        para = para.strip()
-        if para:
-            safe = para.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            story.append(Paragraph(safe, body))
-            story.append(Spacer(1, 4))
-    if not story:
-        story.append(Paragraph("(empty document)", body))
-    doc.build(story)
+    status = pisa.CreatePDF(
+        src=html_content,
+        dest=buf,
+        encoding="utf-8",
+    )
+
+    if status.err:
+        # Fallback: strip HTML and render plain text via reportlab
+        import re
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import cm
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+
+        text = re.sub(r"<[^>]+>", " ", html_content)
+        text = re.sub(r"&nbsp;", " ", text)
+        text = re.sub(r"&amp;",  "&", text)
+        text = re.sub(r"&lt;",   "<", text)
+        text = re.sub(r"&gt;",   ">", text)
+        text = re.sub(r"\s+",    " ", text).strip()
+
+        buf2 = io.BytesIO()
+        styles = getSampleStyleSheet()
+        body = ParagraphStyle("B", parent=styles["Normal"], fontSize=11, leading=17)
+        doc = SimpleDocTemplate(buf2, pagesize=A4,
+                                leftMargin=2.5*cm, rightMargin=2.5*cm,
+                                topMargin=2.5*cm,  bottomMargin=2.5*cm)
+        story = []
+        for line in text.split(". "):
+            line = line.strip()
+            if line:
+                safe = (line.replace("&", "&amp;")
+                            .replace("<", "&lt;")
+                            .replace(">", "&gt;"))
+                story.append(Paragraph(safe, body))
+                story.append(Spacer(1, 4))
+        if not story:
+            story.append(Paragraph("(empty document)", body))
+        doc.build(story)
+        return buf2.getvalue()
+
     return buf.getvalue()
 
 
@@ -1129,92 +1096,100 @@ def do_pdf_to_html(pdf_bytes: bytes) -> bytes:
 def do_remove_background(img_bytes: bytes) -> bytes:
     """
     Remove image background.
-    Primary:  rembg (AI model — best quality, install separately)
-    Fallback: Pillow GrabCut-style edge detection (good for simple backgrounds)
+    Primary:  rembg (AI, optional)
+    Fallback: Pillow GrabCut-style with size limit to prevent hanging
     """
-    # ── Primary: rembg AI model (optional — install separately for best quality) ─
+    from PIL import Image, ImageFilter
+
+    # ── Primary: rembg (if installed) ────────────────────────────────────────
     try:
         import importlib
         rembg_mod = importlib.import_module("rembg")
-        from PIL import Image
-        input_img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
-        output_img = rembg_mod.remove(input_img)
-        buf = io.BytesIO()
-        output_img.save(buf, format="PNG")
-        return buf.getvalue()
+        with Image.open(io.BytesIO(img_bytes)) as img:
+            output = rembg_mod.remove(img.convert("RGBA"))
+            buf = io.BytesIO()
+            output.save(buf, format="PNG")
+            return buf.getvalue()
     except (ImportError, ModuleNotFoundError):
-        pass  # rembg not installed, fall through to Pillow fallback
+        pass
     except Exception:
         pass
 
-    # ── Fallback: Pillow flood-fill background removal ────────────────────────
-    # Works well on images with uniform/solid backgrounds (white, solid colour)
-    from PIL import Image, ImageFilter
-
+    # ── Fallback: Pillow flood-fill (capped at 800px to prevent hanging) ─────
     with Image.open(io.BytesIO(img_bytes)) as img:
         img = img.convert("RGBA")
-        width, height = img.size
+        w, h = img.size
+
+        # Resize large images to max 800px to prevent BFS from hanging
+        MAX_DIM = 800
+        scale = 1.0
+        if w > MAX_DIM or h > MAX_DIM:
+            scale = MAX_DIM / max(w, h)
+            new_w = int(w * scale)
+            new_h = int(h * scale)
+            img = img.resize((new_w, new_h), Image.LANCZOS)
+            w, h = new_w, new_h
+
         pixels = img.load()
 
-        # Sample background colour from the 4 corners
+        # Sample background colour from 4 corners
         corners = [
-            pixels[0, 0],
-            pixels[width - 1, 0],
-            pixels[0, height - 1],
-            pixels[width - 1, height - 1],
+            pixels[0, 0], pixels[w-1, 0],
+            pixels[0, h-1], pixels[w-1, h-1],
         ]
-        # Average RGBA of corners
         bg_r = sum(c[0] for c in corners) // 4
         bg_g = sum(c[1] for c in corners) // 4
         bg_b = sum(c[2] for c in corners) // 4
+        tolerance = 35
 
-        # Tolerance for colour matching
-        tolerance = 40
+        def is_bg(r, g, b, a):
+            return (abs(r - bg_r) < tolerance and
+                    abs(g - bg_g) < tolerance and
+                    abs(b - bg_b) < tolerance)
 
-        def is_background(r, g, b, a):
-            return (
-                abs(r - bg_r) < tolerance and
-                abs(g - bg_g) < tolerance and
-                abs(b - bg_b) < tolerance
-            )
-
-        # BFS flood fill from all 4 edges to mark background pixels
+        # BFS flood fill from all edges — capped at 500k pixels max
         from collections import deque
         visited = set()
         queue = deque()
+        MAX_PIXELS = 500_000
 
-        # Seed from edges
-        for x in range(width):
-            for y in [0, height - 1]:
+        # Seed from all 4 edges
+        for x in range(w):
+            for y in [0, h-1]:
                 if (x, y) not in visited:
                     r, g, b, a = pixels[x, y]
-                    if is_background(r, g, b, a):
+                    if is_bg(r, g, b, a):
                         queue.append((x, y))
                         visited.add((x, y))
-        for y in range(height):
-            for x in [0, width - 1]:
+        for y in range(h):
+            for x in [0, w-1]:
                 if (x, y) not in visited:
                     r, g, b, a = pixels[x, y]
-                    if is_background(r, g, b, a):
+                    if is_bg(r, g, b, a):
                         queue.append((x, y))
                         visited.add((x, y))
 
-        while queue:
+        processed = 0
+        while queue and processed < MAX_PIXELS:
             x, y = queue.popleft()
             r, g, b, a = pixels[x, y]
-            if not is_background(r, g, b, a):
+            if not is_bg(r, g, b, a):
                 continue
-            # Make transparent
-            pixels[x, y] = (r, g, b, 0)
+            pixels[x, y] = (r, g, b, 0)  # transparent
+            processed += 1
             for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
-                nx, ny = x + dx, y + dy
-                if 0 <= nx < width and 0 <= ny < height and (nx, ny) not in visited:
+                nx, ny = x+dx, y+dy
+                if 0 <= nx < w and 0 <= ny < h and (nx, ny) not in visited:
                     visited.add((nx, ny))
                     queue.append((nx, ny))
 
-        # Smooth edges slightly
-        img = img.filter(ImageFilter.SMOOTH_MORE)
+        # If we scaled down, scale back up
+        if scale < 1.0:
+            orig_w = int(w / scale)
+            orig_h = int(h / scale)
+            img = img.resize((orig_w, orig_h), Image.LANCZOS)
 
+        img = img.filter(ImageFilter.SMOOTH)
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         return buf.getvalue()
