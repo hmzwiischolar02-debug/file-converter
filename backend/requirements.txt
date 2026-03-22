@@ -29,7 +29,8 @@ docx2pdf==0.1.8
 
 # ── Word → PDF: good quality, pure Python ─────────────
 mammoth==1.8.0
-# xhtml2pdf removed — using pure reportlab HTML parser instead
+weasyprint==62.3        # HTML→PDF with full CSS (works on Linux/Railway)
+xhtml2pdf==0.2.16       # HTML→PDF fallback
 
 # ── Rate limiting ───────────────────────────────────────
 slowapi==0.1.9
