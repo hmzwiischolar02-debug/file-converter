@@ -25,7 +25,7 @@ import tempfile
 from pathlib import Path
 from typing import List
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, Request
+from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -888,34 +888,128 @@ def do_png_to_jpg(img_bytes: bytes) -> bytes:
 
 
 def do_html_to_pdf(html_bytes: bytes) -> bytes:
-    """HTML → PDF using xhtml2pdf (pure Python)."""
-    from xhtml2pdf import pisa
-
+    """
+    HTML → PDF
+    Primary:  PyMuPDF (fitz.open with html story) — handles modern HTML well
+    Fallback: reportlab with basic text extraction
+    """
     html_content = html_bytes.decode("utf-8", errors="replace")
 
-    # Inject base styles if not present
-    if "<style" not in html_content.lower():
-        style = """<style>
-        @page { margin: 2cm; }
-        body { font-family: Helvetica, Arial, sans-serif; font-size: 11pt; line-height: 1.6; color: #000; }
-        h1 { font-size: 20pt; font-weight: bold; margin: 14pt 0 8pt; }
-        h2 { font-size: 16pt; font-weight: bold; margin: 12pt 0 6pt; }
-        h3 { font-size: 13pt; font-weight: bold; margin: 10pt 0 4pt; }
-        p  { margin: 0 0 8pt; }
-        table { border-collapse: collapse; width: 100%; margin: 10pt 0; }
-        td, th { border: 1px solid #ccc; padding: 5pt 7pt; font-size: 9pt; }
-        th { background-color: #2563eb; color: white; font-weight: bold; }
-        ul, ol { margin: 0 0 8pt 18pt; }
-        li { margin-bottom: 3pt; }
+    # ── Primary: PyMuPDF HTML rendering ───────────────────────────────────────
+    try:
+        import fitz
+
+        # Ensure valid HTML structure
+        if "<html" not in html_content.lower():
+            html_content = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"/>
+<style>
+  body {{ font-family: Arial, sans-serif; font-size: 12pt;
+         line-height: 1.6; margin: 2cm; color: #000; }}
+  h1 {{ font-size: 20pt; font-weight: bold; margin: 14pt 0 8pt; }}
+  h2 {{ font-size: 16pt; font-weight: bold; margin: 12pt 0 6pt; }}
+  table {{ border-collapse: collapse; width: 100%; }}
+  td, th {{ border: 1px solid #ccc; padding: 5pt 7pt; }}
+  th {{ background: #2563eb; color: white; font-weight: bold; }}
+</style>
+</head><body>{html_content}</body></html>"""
+
+        # Write to temp file — PyMuPDF needs a file path for HTML
+        with tempfile.NamedTemporaryFile(suffix=".html", delete=False,
+                                         mode="w", encoding="utf-8") as tmp:
+            tmp.write(html_content)
+            tmp_path = tmp.name
+
+        try:
+            # Open as HTML story and render to PDF
+            doc = fitz.open()
+            with fitz.open(tmp_path) as html_doc:
+                for page in html_doc:
+                    doc.new_page(width=595, height=842)   # A4
+            # Use fitz Story for proper HTML rendering
+            story = fitz.Story(html_content, em=10)
+            mediabox = fitz.Rect(0, 0, 595, 842)
+            margins = (50, 50, 50, 50)  # left, top, right, bottom
+
+            writer = fitz.DocumentWriter(buf := io.BytesIO())
+            more = True
+            while more:
+                device = writer.begin_page(mediabox)
+                filled, more = story.place(mediabox + margins)
+                story.draw(device)
+                writer.end_page()
+            writer.close()
+            result = buf.getvalue()
+            if len(result) > 500:
+                return result
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+
+    except Exception as e:
+        pass  # fall through to xhtml2pdf
+
+    # ── Fallback: xhtml2pdf ────────────────────────────────────────────────────
+    try:
+        from xhtml2pdf import pisa
+
+        # Add minimal styles if none present
+        base_style = """<style>
+          @page { margin: 2cm; }
+          body { font-family: Helvetica, Arial, sans-serif; font-size: 11pt;
+                 line-height: 1.6; color: #000; }
+          h1 { font-size: 18pt; font-weight: bold; margin: 12pt 0 6pt; }
+          h2 { font-size: 14pt; font-weight: bold; margin: 10pt 0 4pt; }
+          p  { margin: 0 0 7pt; }
+          table { border-collapse: collapse; width: 100%; margin: 8pt 0; }
+          td, th { border: 1px solid #ccc; padding: 4pt 6pt; font-size: 9pt; }
+          ul, ol { margin: 0 0 7pt 16pt; }
         </style>"""
-        html_content = html_content.replace("<head>", f"<head>{style}", 1)
-        if "<head>" not in html_content:
-            html_content = f"<html><head>{style}</head><body>{html_content}</body></html>"
+
+        if "<style" not in html_content.lower():
+            if "<head>" in html_content:
+                html_content = html_content.replace("<head>", f"<head>{base_style}", 1)
+            else:
+                html_content = f"<html><head>{base_style}</head><body>{html_content}</body></html>"
+
+        buf = io.BytesIO()
+        status = pisa.CreatePDF(html_content, dest=buf, encoding="utf-8")
+        if not status.err:
+            return buf.getvalue()
+    except Exception:
+        pass
+
+    # ── Last resort: extract text with BeautifulSoup + reportlab ──────────────
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib import colors
+    import re
+
+    # Strip HTML tags
+    text = re.sub(r'<[^>]+>', ' ', html_content)
+    text = re.sub(r'&nbsp;', ' ', text)
+    text = re.sub(r'&amp;', '&', text)
+    text = re.sub(r'&lt;', '<', text)
+    text = re.sub(r'&gt;', '>', text)
+    text = re.sub(r'\s+', ' ', text).strip()
 
     buf = io.BytesIO()
-    status = pisa.CreatePDF(html_content, dest=buf, encoding="utf-8")
-    if status.err:
-        raise HTTPException(500, f"HTML to PDF conversion failed with error code {status.err}")
+    styles = getSampleStyleSheet()
+    body = ParagraphStyle("B", parent=styles["Normal"], fontSize=11, leading=17)
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            leftMargin=2.5*cm, rightMargin=2.5*cm,
+                            topMargin=2.5*cm, bottomMargin=2.5*cm)
+    story = []
+    for para in text.split(". "):
+        para = para.strip()
+        if para:
+            safe = para.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            story.append(Paragraph(safe, body))
+            story.append(Spacer(1, 4))
+    if not story:
+        story.append(Paragraph("(empty document)", body))
+    doc.build(story)
     return buf.getvalue()
 
 
@@ -1030,6 +1124,32 @@ def do_pdf_to_html(pdf_bytes: bytes) -> bytes:
 </html>"""
 
     return full_html.encode("utf-8")
+
+
+def do_remove_background(img_bytes: bytes) -> bytes:
+    """
+    Remove image background using rembg (AI-based, pure Python).
+    Returns PNG with transparent background.
+    """
+    try:
+        from rembg import remove as rembg_remove
+        from PIL import Image
+
+        input_img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+        output_img = rembg_remove(input_img)
+
+        buf = io.BytesIO()
+        output_img.save(buf, format="PNG")
+        return buf.getvalue()
+
+    except ImportError:
+        raise HTTPException(
+            500,
+            "Background removal requires rembg. "
+            "Install it on the server: pip install rembg"
+        )
+    except Exception as e:
+        raise HTTPException(500, f"Background removal failed: {e}")
 
 
 # ── Diagnostics endpoint ───────────────────────────────────────────────────────
@@ -1385,7 +1505,7 @@ async def compress_image(request: Request, files: List[UploadFile] = File(...)):
 async def unlock_pdf(
     request: Request,
     files: List[UploadFile] = File(...),
-    password: str = "",
+    password: str = Form(default=""),
 ):
     f = files[0]
     if Path(f.filename or "").suffix.lower() != ".pdf":
@@ -1467,7 +1587,7 @@ async def html_to_pdf(request: Request, files: List[UploadFile] = File(...)):
 async def watermark_pdf(
     request: Request,
     files: List[UploadFile] = File(...),
-    watermark_text: str = "CONFIDENTIAL",
+    watermark_text: str = Form(default="CONFIDENTIAL"),
 ):
     f = files[0]
     if Path(f.filename or "").suffix.lower() != ".pdf":
@@ -1504,3 +1624,25 @@ async def pdf_to_html(request: Request, files: List[UploadFile] = File(...)):
         raise HTTPException(500, f"PDF to HTML failed: {e}")
     name = Path(f.filename or "document").stem + ".html"
     return stream(data, name, "text/html")
+
+
+# ── 18. Remove Background ──────────────────────────────────────────────────────
+@limiter.limit(RATE_LIMIT)
+@app.post("/convert/remove-background")
+async def remove_background(request: Request, files: List[UploadFile] = File(...)):
+    f = files[0]
+    ext = Path(f.filename or "").suffix.lower()
+    if ext not in {".jpg", ".jpeg", ".png"}:
+        raise HTTPException(422, "Please upload a JPG or PNG file.")
+    raw = await f.read()
+    validate_size(raw)
+    try:
+        data = await asyncio.get_event_loop().run_in_executor(
+            None, do_remove_background, raw
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Background removal failed: {e}")
+    name = Path(f.filename or "image").stem + "_nobg.png"
+    return stream(data, name, "image/png")

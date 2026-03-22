@@ -290,6 +290,31 @@ export const TOOLS = {
 
 
 
+
+  "remove-background": {
+    id: "remove-background",
+    name: "Remove Background",
+    emoji: "✂️",
+    from: "JPG / PNG",
+    to: "PNG (No Background)",
+    outputExt: ".png",
+    accept: ".jpg,.jpeg,.png",
+    acceptMime: "image/jpeg,image/png",
+    color: "#DB2777",
+    lightBg: "#fdf2f8",
+    category: "image",
+    description: "Remove the background from any image automatically. Get a transparent PNG in seconds.",
+    metaTitle: "Remove Image Background – Free Online | FileConvert",
+    metaDesc: "Remove background from image free online. Get transparent PNG instantly, no signup needed.",
+    keywords: ["remove background free", "background remover online", "transparent background png"],
+    steps: ["Upload your JPG or PNG", "AI removes the background", "Download transparent PNG"],
+    faq: [
+      { q: "Is background removal free?", a: "Yes, completely free with no signup required." },
+      { q: "What output format do I get?", a: "You get a PNG file with a transparent background." },
+      { q: "Does it work on any image?", a: "It works best on images with a clear subject — people, products, animals, logos." },
+      { q: "Is there a file size limit?", a: "Up to 10MB on the free plan." },
+    ],
+  },
   "jpg-to-png": {
     id: "jpg-to-png",
     name: "JPG to PNG",
