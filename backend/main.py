@@ -1128,28 +1128,95 @@ def do_pdf_to_html(pdf_bytes: bytes) -> bytes:
 
 def do_remove_background(img_bytes: bytes) -> bytes:
     """
-    Remove image background using rembg (AI-based, pure Python).
-    Returns PNG with transparent background.
+    Remove image background.
+    Primary:  rembg (AI model — best quality, install separately)
+    Fallback: Pillow GrabCut-style edge detection (good for simple backgrounds)
     """
+    # ── Primary: rembg AI model ───────────────────────────────────────────────
     try:
         from rembg import remove as rembg_remove
         from PIL import Image
-
         input_img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
         output_img = rembg_remove(input_img)
-
         buf = io.BytesIO()
         output_img.save(buf, format="PNG")
         return buf.getvalue()
-
     except ImportError:
-        raise HTTPException(
-            500,
-            "Background removal requires rembg. "
-            "Install it on the server: pip install rembg"
-        )
-    except Exception as e:
-        raise HTTPException(500, f"Background removal failed: {e}")
+        pass  # rembg not installed, use fallback
+    except Exception:
+        pass
+
+    # ── Fallback: Pillow flood-fill background removal ────────────────────────
+    # Works well on images with uniform/solid backgrounds (white, solid colour)
+    from PIL import Image, ImageFilter
+
+    with Image.open(io.BytesIO(img_bytes)) as img:
+        img = img.convert("RGBA")
+        width, height = img.size
+        pixels = img.load()
+
+        # Sample background colour from the 4 corners
+        corners = [
+            pixels[0, 0],
+            pixels[width - 1, 0],
+            pixels[0, height - 1],
+            pixels[width - 1, height - 1],
+        ]
+        # Average RGBA of corners
+        bg_r = sum(c[0] for c in corners) // 4
+        bg_g = sum(c[1] for c in corners) // 4
+        bg_b = sum(c[2] for c in corners) // 4
+
+        # Tolerance for colour matching
+        tolerance = 40
+
+        def is_background(r, g, b, a):
+            return (
+                abs(r - bg_r) < tolerance and
+                abs(g - bg_g) < tolerance and
+                abs(b - bg_b) < tolerance
+            )
+
+        # BFS flood fill from all 4 edges to mark background pixels
+        from collections import deque
+        visited = set()
+        queue = deque()
+
+        # Seed from edges
+        for x in range(width):
+            for y in [0, height - 1]:
+                if (x, y) not in visited:
+                    r, g, b, a = pixels[x, y]
+                    if is_background(r, g, b, a):
+                        queue.append((x, y))
+                        visited.add((x, y))
+        for y in range(height):
+            for x in [0, width - 1]:
+                if (x, y) not in visited:
+                    r, g, b, a = pixels[x, y]
+                    if is_background(r, g, b, a):
+                        queue.append((x, y))
+                        visited.add((x, y))
+
+        while queue:
+            x, y = queue.popleft()
+            r, g, b, a = pixels[x, y]
+            if not is_background(r, g, b, a):
+                continue
+            # Make transparent
+            pixels[x, y] = (r, g, b, 0)
+            for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < width and 0 <= ny < height and (nx, ny) not in visited:
+                    visited.add((nx, ny))
+                    queue.append((nx, ny))
+
+        # Smooth edges slightly
+        img = img.filter(ImageFilter.SMOOTH_MORE)
+
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return buf.getvalue()
 
 
 # ── Diagnostics endpoint ───────────────────────────────────────────────────────

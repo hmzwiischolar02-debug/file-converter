@@ -2,36 +2,45 @@
 import { useState, useCallback } from "react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const TIMEOUT_MS = 120_000; // 2 minutes — enough for heavy conversions
 
 async function callAPI(toolId, files, extras = {}) {
   const formData = new FormData();
   files.forEach((f) => formData.append("files", f));
 
-  // Append any extra fields (e.g. password for unlock-pdf)
   Object.entries(extras).forEach(([key, val]) => {
     if (val !== undefined && val !== null && val !== "") {
       formData.append(key, val);
     }
   });
 
+  // AbortController gives us a proper timeout
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
   let res;
   try {
     res = await fetch(`${API_BASE}/convert/${toolId}`, {
       method: "POST",
       body: formData,
+      signal: controller.signal,
     });
-  } catch {
+  } catch (err) {
+    if (err.name === "AbortError") {
+      throw new Error(
+        "Conversion timed out after 2 minutes. Try a smaller file."
+      );
+    }
     throw new Error(
-      "Cannot reach the backend server. Make sure it is running on port 8000."
+      "Cannot reach the backend server. Please try again in a moment."
     );
+  } finally {
+    clearTimeout(timer);
   }
 
   if (!res.ok) {
-    // Rate limit exceeded
     if (res.status === 429) {
-      throw new Error(
-        "Too many conversions. Please wait a minute and try again."
-      );
+      throw new Error("Too many conversions. Please wait a minute and try again.");
     }
     let detail = `Server error (${res.status})`;
     try {
@@ -83,7 +92,6 @@ export function useConverter(tool) {
     [tool]
   );
 
-  // extras: optional object e.g. { password: "abc" }
   const convert = useCallback(
     async (extras = {}) => {
       if (!files.length) return;
@@ -92,8 +100,14 @@ export function useConverter(tool) {
       setProgress(0);
       setError(null);
 
+      // Progress animation — speeds up near the end to show activity
       const interval = setInterval(() => {
-        setProgress((p) => (p >= 85 ? 85 : p + Math.random() * 10));
+        setProgress((p) => {
+          if (p < 60) return p + Math.random() * 12;
+          if (p < 80) return p + Math.random() * 4;
+          if (p < 90) return p + Math.random() * 1.5;
+          return p; // Hold at 90% until real response
+        });
       }, 400);
 
       try {
