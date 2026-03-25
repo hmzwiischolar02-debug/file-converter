@@ -1,9 +1,39 @@
-const H = { horizontal: "h-20", square: "h-56", sidebar: "h-44" };
-export default function AdBanner({ variant = "horizontal", className = "" }) {
+// src/components/AdBanner.jsx
+import { useEffect, useRef } from "react";
+
+const CLIENT          = "ca-pub-2285227170104127";
+const SLOT_HORIZONTAL = "2568354631";
+const SLOT_SQUARE     = "4363550984";
+
+function RealAd({ slot }) {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    try {
+      (window.adsbygoogle = window.adsbygoogle || []).push({});
+    } catch (e) {
+      // AdSense not loaded in dev
+    }
+  }, []);
+
   return (
-    <div className={`w-full ${H[variant]} ${className} my-5 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl flex items-center justify-center gap-3 text-slate-400 text-sm font-medium`}>
-      <span>📢</span><span>Advertisement</span>
-      <span className="text-xs bg-slate-200 text-slate-500 px-2 py-0.5 rounded">Google AdSense</span>
+    <ins
+      ref={ref}
+      className="adsbygoogle"
+      style={{ display: "block", width: "100%" }}
+      data-ad-client={CLIENT}
+      data-ad-slot={slot}
+      data-ad-format="auto"
+      data-full-width-responsive="true"
+    />
+  );
+}
+
+export default function AdBanner({ variant = "horizontal", className = "" }) {
+  const slot = variant === "square" ? SLOT_SQUARE : SLOT_HORIZONTAL;
+  return (
+    <div className={`w-full my-5 overflow-hidden ${className}`}>
+      <RealAd slot={slot} />
     </div>
   );
 }
